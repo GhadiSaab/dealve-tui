@@ -18,6 +18,8 @@ pub struct DealInfo {
     pub price: PriceInfo,
     pub cut: u8,
     pub url: String,
+    #[serde(rename = "historyLow")]
+    pub history_low: Option<HistoryPrice>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -30,6 +32,11 @@ pub struct ShopInfo {
 pub struct PriceInfo {
     pub amount: f64,
     pub currency: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HistoryPrice {
+    pub amount: f64,
 }
 
 impl From<DealItem> for dealve_core::models::Deal {
@@ -46,6 +53,7 @@ impl From<DealItem> for dealve_core::models::Deal {
                 discount: item.deal.cut,
             },
             url: item.deal.url,
+            history_low: item.deal.history_low.map(|h| h.amount),
         }
     }
 }

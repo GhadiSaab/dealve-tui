@@ -7,6 +7,7 @@ pub struct Deal {
     pub shop: Shop,
     pub price: Price,
     pub url: String,
+    pub history_low: Option<f64>,
 }
 
 /// Store/shop information
