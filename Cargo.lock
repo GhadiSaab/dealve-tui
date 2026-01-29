@@ -233,6 +233,7 @@ dependencies = [
  "crossterm",
  "dealve-api",
  "dealve-core",
+ "dotenvy",
  "ratatui",
  "tokio",
  "tracing",

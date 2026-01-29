@@ -8,13 +8,24 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::io::{stdout, Stdout};
+use std::{env, io::{stdout, Stdout}};
 
 use app::App;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
+
+    let api_key = env::var("ITAD_API_KEY").ok();
+    if api_key.is_none() {
+        eprintln!("Error: ITAD_API_KEY not set.");
+        eprintln!("Create a .env file with:");
+        eprintln!("ITAD_API_KEY=your_key_here");
+        return Ok(());
+    }
+
     let mut terminal = setup_terminal()?;
-    let result = run(&mut terminal);
+    let result = run(&mut terminal, api_key).await;
     restore_terminal()?;
     result
 }
@@ -33,8 +44,10 @@ fn restore_terminal() -> Result<()> {
     Ok(())
 }
 
-fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
-    let mut app = App::new();
+async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<String>) -> Result<()> {
+    let mut app = App::new(api_key);
+
+    app.load_deals().await;
 
     loop {
         terminal.draw(|frame| ui::render(frame, &app))?;
@@ -50,6 +63,9 @@ fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
                         KeyCode::Char('q') | KeyCode::Esc => app.quit(),
                         KeyCode::Down | KeyCode::Char('j') => app.next(),
                         KeyCode::Up | KeyCode::Char('k') => app.previous(),
+                        KeyCode::Char('r') => {
+                            app.load_deals().await;
+                        }
                         _ => {}
                     }
                 }
