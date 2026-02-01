@@ -224,6 +224,31 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                             }
                             _ => {}
                         }
+                    } else if app.filter_active {
+                        // Filter input mode
+                        match key.code {
+                            KeyCode::Esc => {
+                                app.cancel_filter();
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            KeyCode::Enter => {
+                                app.confirm_filter();
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            KeyCode::Backspace => {
+                                app.filter_pop();
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            KeyCode::Char(c) => {
+                                app.filter_push(c);
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            _ => {}
+                        }
                     } else {
                         match key.code {
                             KeyCode::Esc | KeyCode::Char('q') => app.toggle_menu(),
@@ -239,6 +264,9 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                             }
                             KeyCode::Char('p') => {
                                 app.open_platform_popup();
+                            }
+                            KeyCode::Char('f') => {
+                                app.start_filter();
                             }
                             KeyCode::Enter => app.open_selected_deal(),
                             KeyCode::Char('r') => {
@@ -257,6 +285,14 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                                 app.cycle_sort_order();
                                 last_selection_change = std::time::Instant::now();
                                 pending_game_info_load = true;
+                            }
+                            KeyCode::Char('c') => {
+                                // Clear filter if one is active
+                                if !app.filter_text.is_empty() {
+                                    app.clear_filter();
+                                    last_selection_change = std::time::Instant::now();
+                                    pending_game_info_load = true;
+                                }
                             }
                             _ => {}
                         }

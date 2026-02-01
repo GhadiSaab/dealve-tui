@@ -245,6 +245,26 @@ fn build_status_line(app: &App, dimmed: bool) -> Line<'static> {
 
     let mut spans: Vec<Span> = Vec::new();
 
+    // Filter: show input field when active, otherwise show "filter" shortcut
+    if app.filter_active {
+        // Show "f" in pink, space, then the input text, then "⏎" (Enter) in pink
+        spans.push(Span::styled("f ", Style::default().fg(shortcut_color)));
+        spans.push(Span::styled(app.filter_text.clone(), Style::default().fg(text_color)));
+        spans.push(Span::styled("_", Style::default().fg(text_color))); // Cursor
+        spans.push(Span::styled(" ⏎", Style::default().fg(shortcut_color)));
+        spans.push(Span::styled(" ", Style::default().fg(text_color)));
+    } else if !app.filter_text.is_empty() {
+        // Filter is set but not active - show current filter with clear option
+        spans.push(Span::styled("f", Style::default().fg(shortcut_color)));
+        spans.push(Span::styled(format!("[{}] ", app.filter_text.clone()), Style::default().fg(value_color)));
+        spans.push(Span::styled("c", Style::default().fg(shortcut_color)));
+        spans.push(Span::styled("lear ", Style::default().fg(text_color)));
+    } else {
+        // No filter - show "filter" shortcut
+        spans.push(Span::styled("f", Style::default().fg(shortcut_color)));
+        spans.push(Span::styled("ilter ", Style::default().fg(text_color)));
+    }
+
     // Platform: "platform" with 'p' highlighted (no value since it's in title now)
     spans.push(Span::styled("p", Style::default().fg(shortcut_color)));
     spans.push(Span::styled("latform ", Style::default().fg(text_color)));
@@ -773,6 +793,8 @@ fn render_keybinds_popup(frame: &mut Frame) {
         "",
         "  [Up/Down] or [j/k]  Navigate",
         "  [Enter]             Open deal / Select",
+        "  [f]                 Filter by name",
+        "  [c]                 Clear filter",
         "  [p]                 Change platform",
         "  [s]                 Cycle sort order",
         "  [r]                 Refresh deals",

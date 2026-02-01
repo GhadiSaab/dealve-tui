@@ -194,6 +194,9 @@ pub struct App {
     pub deals_page_size: usize,
     pub load_more_threshold: usize,
     pub game_info_delay_ms: u64,
+    // Filter state
+    pub filter_active: bool,
+    pub filter_text: String,
     client: ItadClient,
 }
 
@@ -232,6 +235,8 @@ impl App {
             deals_page_size: config.deals_page_size,
             load_more_threshold: config.load_more_threshold,
             game_info_delay_ms: config.game_info_delay_ms,
+            filter_active: false,
+            filter_text: String::new(),
             client: ItadClient::new(api_key),
         }
     }
@@ -293,6 +298,12 @@ impl App {
                 .collect(),
         };
 
+        // Apply name filter only when confirmed (not during active typing)
+        if !self.filter_active && !self.filter_text.is_empty() {
+            let filter_lower = self.filter_text.to_lowercase();
+            deals.retain(|deal| deal.title.to_lowercase().contains(&filter_lower));
+        }
+
         // Sort based on current sort order
         match self.sort_order {
             SortOrder::None => {} // Keep API order
@@ -310,6 +321,44 @@ impl App {
     pub fn cycle_sort_order(&mut self) {
         self.sort_order = self.sort_order.next();
         // Reset selection to first item when changing sort
+        self.list_state.select(Some(0));
+    }
+
+    /// Activate filter input mode
+    pub fn start_filter(&mut self) {
+        self.filter_active = true;
+        self.filter_text.clear();
+    }
+
+    /// Deactivate filter and clear text
+    pub fn cancel_filter(&mut self) {
+        self.filter_active = false;
+        self.filter_text.clear();
+        self.list_state.select(Some(0));
+    }
+
+    /// Confirm filter (just deactivate input mode, keep filter text)
+    pub fn confirm_filter(&mut self) {
+        self.filter_active = false;
+        self.list_state.select(Some(0));
+    }
+
+    /// Add character to filter text
+    pub fn filter_push(&mut self, c: char) {
+        self.filter_text.push(c);
+        self.list_state.select(Some(0));
+    }
+
+    /// Remove last character from filter text
+    pub fn filter_pop(&mut self) {
+        self.filter_text.pop();
+        self.list_state.select(Some(0));
+    }
+
+    /// Clear the filter completely
+    pub fn clear_filter(&mut self) {
+        self.filter_text.clear();
+        self.filter_active = false;
         self.list_state.select(Some(0));
     }
 
