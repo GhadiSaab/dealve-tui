@@ -6,7 +6,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, MenuItem, Popup};
+use crate::app::{App, MenuItem, OptionsTab, Popup};
+use dealve_core::models::Platform;
 
 // Dealve color palette - Pastel theme (light colors for dark background)
 const PURPLE_PRIMARY: Color = Color::Rgb(200, 160, 255);   // Pastel lavender - main brand color
@@ -37,7 +38,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
     match app.popup {
         Popup::None => {}
-        Popup::Options => render_options_popup(frame),
+        Popup::Options => render_options_popup(frame, app),
         Popup::Keybinds => render_keybinds_popup(frame),
     }
 }
@@ -398,31 +399,141 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
     frame.render_widget(menu, menu_area);
 }
 
-fn render_options_popup(frame: &mut Frame) {
+fn render_options_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
-    let popup_width = 40u16;
-    let popup_height = 10u16;
+    let popup_width = 50u16;
+    let popup_height = 22u16;
     let popup_x = area.width.saturating_sub(popup_width) / 2;
     let popup_y = area.height.saturating_sub(popup_height) / 2;
     let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
 
     frame.render_widget(Clear, popup_area);
 
-    let content = vec![
-        "",
-        "  Coming soon...",
-        "",
-        "  [Esc] Close",
-    ];
+    // Main popup block
+    let block = Block::default()
+        .title(Span::styled(" Options ", Style::default().fg(PURPLE_LIGHT)))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(PURPLE_ACCENT));
+    frame.render_widget(block, popup_area);
 
-    let popup = Paragraph::new(content.join("\n"))
-        .style(Style::default().fg(TEXT_PRIMARY))
-        .block(Block::default()
-            .title(Span::styled(" Options ", Style::default().fg(PURPLE_LIGHT)))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(PURPLE_PRIMARY)));
+    // Inner area
+    let inner = Rect::new(
+        popup_area.x + 1,
+        popup_area.y + 1,
+        popup_area.width - 2,
+        popup_area.height - 2,
+    );
 
-    frame.render_widget(popup, popup_area);
+    // Split into tabs bar and content
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Min(0)])
+        .split(inner);
+
+    // Render tabs bar
+    let tabs: Vec<Span> = OptionsTab::ALL
+        .iter()
+        .enumerate()
+        .map(|(i, tab)| {
+            if i == app.options.current_tab {
+                Span::styled(
+                    format!(" {} ", tab.name()),
+                    Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT).add_modifier(Modifier::BOLD),
+                )
+            } else {
+                Span::styled(
+                    format!(" {} ", tab.name()),
+                    Style::default().fg(TEXT_SECONDARY),
+                )
+            }
+        })
+        .collect();
+
+    let tabs_line = Line::from(tabs);
+    let tabs_para = Paragraph::new(tabs_line);
+    frame.render_widget(tabs_para, chunks[0]);
+
+    // Render tab content
+    let content_area = chunks[1];
+    match OptionsTab::ALL[app.options.current_tab] {
+        OptionsTab::Platforms => render_platforms_tab(frame, app, content_area),
+    }
+}
+
+fn render_platforms_tab(frame: &mut Frame, app: &App, area: Rect) {
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Default platform selector (index 0)
+    let is_default_selected = app.options.platform_list_index == 0;
+    let default_style = if is_default_selected {
+        Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+    } else {
+        Style::default().fg(TEXT_PRIMARY)
+    };
+    lines.push(Line::from(vec![
+        Span::styled("Default: ", Style::default().fg(PURPLE_LIGHT)),
+        Span::styled(
+            format!("{} ", app.options.default_platform.name()),
+            default_style,
+        ),
+        if is_default_selected {
+            Span::styled("[Enter to change]", Style::default().fg(TEXT_SECONDARY))
+        } else {
+            Span::raw("")
+        },
+    ]));
+
+    lines.push(Line::from("")); // Spacer
+    lines.push(Line::from(Span::styled(
+        "Enabled platforms:",
+        Style::default().fg(PURPLE_LIGHT),
+    )));
+    lines.push(Line::from("")); // Spacer
+
+    // Platform list with checkboxes (starting at index 1)
+    for (i, platform) in Platform::ALL.iter().enumerate() {
+        let list_index = i + 1;
+        let is_selected = app.options.platform_list_index == list_index;
+        let is_enabled = app.options.enabled_platforms.contains(platform);
+
+        let checkbox = if *platform == Platform::All {
+            "[*]" // Always enabled, can't disable
+        } else if is_enabled {
+            "[x]"
+        } else {
+            "[ ]"
+        };
+
+        let line_style = if is_selected {
+            Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+        } else if is_enabled {
+            Style::default().fg(TEXT_PRIMARY)
+        } else {
+            Style::default().fg(TEXT_DIMMED)
+        };
+
+        lines.push(Line::from(Span::styled(
+            format!(" {} {}", checkbox, platform.name()),
+            line_style,
+        )));
+    }
+
+    lines.push(Line::from("")); // Spacer
+    lines.push(Line::from(Span::styled(
+        "[Space/Enter] Toggle  [Tab] Next tab  [Esc] Close",
+        Style::default().fg(TEXT_SECONDARY),
+    )));
+
+    let paragraph = Paragraph::new(lines).scroll((
+        // Scroll if needed to keep selection visible
+        if app.options.platform_list_index > 12 {
+            (app.options.platform_list_index - 12) as u16
+        } else {
+            0
+        },
+        0,
+    ));
+    frame.render_widget(paragraph, area);
 }
 
 fn render_keybinds_popup(frame: &mut Frame) {
@@ -439,7 +550,7 @@ fn render_keybinds_popup(frame: &mut Frame) {
         "",
         "  [Up/Down] or [j/k]  Navigate",
         "  [Enter]             Open deal / Select",
-        "  [f]                 Open platform filter",
+        "  [p]                 Open platform filter",
         "  [r]                 Refresh deals",
         "  [Esc]               Menu / Close popup",
         "  [q]                 Quit (from menu)",
@@ -458,8 +569,9 @@ fn render_keybinds_popup(frame: &mut Frame) {
 }
 
 fn render_dropdown(frame: &mut Frame, app: &mut App, list_area: Rect) {
+    let enabled_platforms = app.enabled_platforms();
     let dropdown_width = 20u16;
-    let max_visible = 15u16;
+    let max_visible = enabled_platforms.len().min(15) as u16;
     let dropdown_height = max_visible + 2;
 
     let dropdown_x = list_area.x + 2;
@@ -478,7 +590,7 @@ fn render_dropdown(frame: &mut Frame, app: &mut App, list_area: Rect) {
 
     frame.render_widget(Clear, dropdown_area);
 
-    let items: Vec<ListItem> = App::platforms()
+    let items: Vec<ListItem> = enabled_platforms
         .iter()
         .map(|platform| {
             ListItem::new(format!("  {}", platform.name()))

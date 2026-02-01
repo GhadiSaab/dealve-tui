@@ -1,4 +1,5 @@
 mod app;
+mod config;
 mod ui;
 
 use anyhow::Result;
@@ -69,7 +70,17 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
         if event::poll(std::time::Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    if app.popup != Popup::None {
+                    if app.popup == Popup::Options {
+                        match key.code {
+                            KeyCode::Esc => app.close_popup(),
+                            KeyCode::Tab | KeyCode::Right => app.options_next_tab(),
+                            KeyCode::BackTab | KeyCode::Left => app.options_prev_tab(),
+                            KeyCode::Down | KeyCode::Char('j') => app.options_next_item(),
+                            KeyCode::Up | KeyCode::Char('k') => app.options_prev_item(),
+                            KeyCode::Enter | KeyCode::Char(' ') => app.options_toggle_item(),
+                            _ => {}
+                        }
+                    } else if app.popup == Popup::Keybinds {
                         if key.code == KeyCode::Esc {
                             app.close_popup();
                         }
@@ -85,7 +96,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                         }
                     } else if app.show_platform_dropdown {
                         match key.code {
-                            KeyCode::Esc | KeyCode::Char('f') => app.toggle_dropdown(),
+                            KeyCode::Esc | KeyCode::Char('p') => app.toggle_dropdown(),
                             KeyCode::Down | KeyCode::Char('j') => app.dropdown_next(),
                             KeyCode::Up | KeyCode::Char('k') => app.dropdown_previous(),
                             KeyCode::Enter => {
@@ -106,7 +117,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                                 last_selection_change = std::time::Instant::now();
                                 pending_load = true;
                             }
-                            KeyCode::Char('f') => app.toggle_dropdown(),
+                            KeyCode::Char('p') => app.toggle_dropdown(),
                             KeyCode::Enter => app.open_selected_deal(),
                             KeyCode::Char('r') => {
                                 app.load_deals().await;

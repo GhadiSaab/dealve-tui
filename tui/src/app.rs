@@ -1,7 +1,9 @@
 use dealve_api::ItadClient;
 use dealve_core::models::{Deal, GameInfo, Platform};
 use ratatui::widgets::ListState;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+use crate::config::Config;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuItem {
@@ -36,6 +38,77 @@ pub enum Popup {
     Keybinds,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OptionsTab {
+    Platforms,
+    // Future tabs can be added here
+}
+
+impl OptionsTab {
+    pub const ALL: &'static [OptionsTab] = &[
+        OptionsTab::Platforms,
+    ];
+
+    pub fn name(&self) -> &str {
+        match self {
+            OptionsTab::Platforms => "Platforms",
+        }
+    }
+}
+
+/// State for the Options popup
+pub struct OptionsState {
+    pub current_tab: usize,
+    pub platform_list_index: usize,
+    pub default_platform: Platform,
+    pub enabled_platforms: HashSet<Platform>,
+}
+
+impl Default for OptionsState {
+    fn default() -> Self {
+        // All platforms enabled by default
+        let mut enabled = HashSet::new();
+        for platform in Platform::ALL.iter() {
+            enabled.insert(*platform);
+        }
+        Self {
+            current_tab: 0,
+            platform_list_index: 0,
+            default_platform: Platform::All,
+            enabled_platforms: enabled,
+        }
+    }
+}
+
+impl OptionsState {
+    /// Create OptionsState from saved config
+    pub fn from_config(config: &Config) -> Self {
+        let enabled_platforms = config.get_enabled_platforms();
+        let default_platform = config.get_default_platform();
+
+        // Ensure default platform is enabled
+        let default_platform = if enabled_platforms.contains(&default_platform) {
+            default_platform
+        } else {
+            Platform::All
+        };
+
+        Self {
+            current_tab: 0,
+            platform_list_index: 0,
+            default_platform,
+            enabled_platforms,
+        }
+    }
+
+    /// Save current state to config
+    pub fn save_to_config(&self) {
+        let mut config = Config::load();
+        config.update_from_options(self.default_platform, &self.enabled_platforms);
+        let _ = config.save(); // Ignore errors silently
+    }
+}
+
 pub struct App {
     pub show_menu: bool,
     pub menu_selected: usize,
@@ -51,6 +124,8 @@ pub struct App {
     // Game info cache and loading state
     pub game_info_cache: HashMap<String, GameInfo>,
     pub loading_game_info: Option<String>,
+    // Options state
+    pub options: OptionsState,
     client: ItadClient,
 }
 
@@ -59,6 +134,11 @@ impl App {
     pub fn new(api_key: Option<String>) -> Self {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
+
+        // Load config from disk
+        let config = Config::load();
+        let options = OptionsState::from_config(&config);
+        let platform_filter = options.default_platform;
 
         Self {
             show_menu: false,
@@ -69,11 +149,12 @@ impl App {
             should_quit: false,
             loading: false,
             error: None,
-            platform_filter: Platform::All,
+            platform_filter,
             show_platform_dropdown: false,
             dropdown_selected: 0,
             game_info_cache: HashMap::new(),
             loading_game_info: None,
+            options,
             client: ItadClient::new(api_key),
         }
     }
@@ -158,7 +239,8 @@ impl App {
     pub fn toggle_dropdown(&mut self) {
         self.show_platform_dropdown = !self.show_platform_dropdown;
         if self.show_platform_dropdown {
-            self.dropdown_selected = Platform::ALL
+            let enabled = self.enabled_platforms();
+            self.dropdown_selected = enabled
                 .iter()
                 .position(|&p| p == self.platform_filter)
                 .unwrap_or(0);
@@ -166,25 +248,30 @@ impl App {
     }
 
     pub fn dropdown_next(&mut self) {
-        self.dropdown_selected = (self.dropdown_selected + 1) % Platform::ALL.len();
+        let enabled_count = self.enabled_platforms().len();
+        if enabled_count > 0 {
+            self.dropdown_selected = (self.dropdown_selected + 1) % enabled_count;
+        }
     }
 
     pub fn dropdown_previous(&mut self) {
-        if self.dropdown_selected == 0 {
-            self.dropdown_selected = Platform::ALL.len() - 1;
-        } else {
-            self.dropdown_selected -= 1;
+        let enabled_count = self.enabled_platforms().len();
+        if enabled_count > 0 {
+            if self.dropdown_selected == 0 {
+                self.dropdown_selected = enabled_count - 1;
+            } else {
+                self.dropdown_selected -= 1;
+            }
         }
     }
 
     pub async fn dropdown_select(&mut self) {
-        self.platform_filter = Platform::ALL[self.dropdown_selected];
+        let enabled = self.enabled_platforms();
+        if let Some(&platform) = enabled.get(self.dropdown_selected) {
+            self.platform_filter = platform;
+        }
         self.show_platform_dropdown = false;
         self.load_deals().await;
-    }
-
-    pub fn platforms() -> &'static [Platform] {
-        &Platform::ALL
     }
 
     pub fn toggle_menu(&mut self) {
@@ -223,6 +310,101 @@ impl App {
 
     pub fn close_popup(&mut self) {
         self.popup = Popup::None;
+        // Reset options navigation when closing
+        self.options.platform_list_index = 0;
+    }
+
+    // Options navigation
+    pub fn options_next_tab(&mut self) {
+        self.options.current_tab = (self.options.current_tab + 1) % OptionsTab::ALL.len();
+        self.options.platform_list_index = 0;
+    }
+
+    pub fn options_prev_tab(&mut self) {
+        if self.options.current_tab == 0 {
+            self.options.current_tab = OptionsTab::ALL.len() - 1;
+        } else {
+            self.options.current_tab -= 1;
+        }
+        self.options.platform_list_index = 0;
+    }
+
+    pub fn options_next_item(&mut self) {
+        match OptionsTab::ALL[self.options.current_tab] {
+            OptionsTab::Platforms => {
+                // +1 for the "Default Platform" option at the top
+                let total_items = 1 + Platform::ALL.len();
+                self.options.platform_list_index = (self.options.platform_list_index + 1) % total_items;
+            }
+        }
+    }
+
+    pub fn options_prev_item(&mut self) {
+        match OptionsTab::ALL[self.options.current_tab] {
+            OptionsTab::Platforms => {
+                let total_items = 1 + Platform::ALL.len();
+                if self.options.platform_list_index == 0 {
+                    self.options.platform_list_index = total_items - 1;
+                } else {
+                    self.options.platform_list_index -= 1;
+                }
+            }
+        }
+    }
+
+    pub fn options_toggle_item(&mut self) {
+        match OptionsTab::ALL[self.options.current_tab] {
+            OptionsTab::Platforms => {
+                if self.options.platform_list_index == 0 {
+                    // Cycle through enabled platforms for default
+                    self.cycle_default_platform();
+                } else {
+                    // Toggle platform enabled/disabled
+                    let platform_idx = self.options.platform_list_index - 1;
+                    if let Some(&platform) = Platform::ALL.get(platform_idx) {
+                        // Don't allow disabling "All"
+                        if platform != Platform::All {
+                            if self.options.enabled_platforms.contains(&platform) {
+                                self.options.enabled_platforms.remove(&platform);
+                            } else {
+                                self.options.enabled_platforms.insert(platform);
+                            }
+                        }
+                    }
+                }
+                // Save after any change
+                self.options.save_to_config();
+            }
+        }
+    }
+
+    fn cycle_default_platform(&mut self) {
+        // Find current index
+        let current_idx = Platform::ALL
+            .iter()
+            .position(|&p| p == self.options.default_platform)
+            .unwrap_or(0);
+
+        // Find next enabled platform
+        let len = Platform::ALL.len();
+        for i in 1..=len {
+            let next_idx = (current_idx + i) % len;
+            let next_platform = Platform::ALL[next_idx];
+            if self.options.enabled_platforms.contains(&next_platform) {
+                self.options.default_platform = next_platform;
+                self.platform_filter = next_platform;
+                // Note: save_to_config is called by options_toggle_item after this
+                return;
+            }
+        }
+    }
+
+    pub fn enabled_platforms(&self) -> Vec<Platform> {
+        Platform::ALL
+            .iter()
+            .copied()
+            .filter(|p| self.options.enabled_platforms.contains(p))
+            .collect()
     }
 
     pub fn selected_deal(&self) -> Option<&Deal> {
