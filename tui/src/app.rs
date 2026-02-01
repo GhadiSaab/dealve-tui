@@ -69,18 +69,21 @@ impl SortOrder {
 pub enum OptionsTab {
     Region,
     Platforms,
+    Advanced,
 }
 
 impl OptionsTab {
     pub const ALL: &'static [OptionsTab] = &[
         OptionsTab::Region,
         OptionsTab::Platforms,
+        OptionsTab::Advanced,
     ];
 
     pub fn name(&self) -> &str {
         match self {
             OptionsTab::Region => "Region",
             OptionsTab::Platforms => "Platforms",
+            OptionsTab::Advanced => "Advanced",
         }
     }
 }
@@ -90,9 +93,14 @@ pub struct OptionsState {
     pub current_tab: usize,
     pub platform_list_index: usize,
     pub region_list_index: usize,
+    pub advanced_list_index: usize,
     pub default_platform: Platform,
     pub enabled_platforms: HashSet<Platform>,
     pub region: Region,
+    // Advanced settings
+    pub deals_page_size: usize,
+    pub load_more_threshold: usize,
+    pub game_info_delay_ms: u64,
 }
 
 impl Default for OptionsState {
@@ -106,9 +114,13 @@ impl Default for OptionsState {
             current_tab: 0,
             platform_list_index: 0,
             region_list_index: 0,
+            advanced_list_index: 0,
             default_platform: Platform::All,
             enabled_platforms: enabled,
             region: Region::default(),
+            deals_page_size: 50,
+            load_more_threshold: 10,
+            game_info_delay_ms: 200,
         }
     }
 }
@@ -131,9 +143,13 @@ impl OptionsState {
             current_tab: 0,
             platform_list_index: 0,
             region_list_index: 0,
+            advanced_list_index: 0,
             default_platform,
             enabled_platforms,
             region,
+            deals_page_size: config.deals_page_size,
+            load_more_threshold: config.load_more_threshold,
+            game_info_delay_ms: config.game_info_delay_ms,
         }
     }
 
@@ -141,6 +157,9 @@ impl OptionsState {
     pub fn save_to_config(&self) {
         let mut config = Config::load();
         config.update_from_options(self.default_platform, &self.enabled_platforms, self.region);
+        config.deals_page_size = self.deals_page_size;
+        config.load_more_threshold = self.load_more_threshold;
+        config.game_info_delay_ms = self.game_info_delay_ms;
         let _ = config.save(); // Ignore errors silently
     }
 }
@@ -167,6 +186,14 @@ pub struct App {
     pub sort_order: SortOrder,
     // Platform popup selection
     pub platform_popup_index: usize,
+    // Pagination state
+    pub deals_offset: usize,
+    pub has_more_deals: bool,
+    pub loading_more: bool,
+    // Configurable parameters
+    pub deals_page_size: usize,
+    pub load_more_threshold: usize,
+    pub game_info_delay_ms: u64,
     client: ItadClient,
 }
 
@@ -199,6 +226,12 @@ impl App {
             spinner_frame: 0,
             sort_order: SortOrder::default(),
             platform_popup_index: 0,
+            deals_offset: 0,
+            has_more_deals: true,
+            loading_more: false,
+            deals_page_size: config.deals_page_size,
+            load_more_threshold: config.load_more_threshold,
+            game_info_delay_ms: config.game_info_delay_ms,
             client: ItadClient::new(api_key),
         }
     }
@@ -336,6 +369,32 @@ impl App {
         }
     }
 
+    /// Reset pagination state (called when changing filters)
+    pub fn reset_pagination(&mut self) {
+        self.deals.clear();
+        self.deals_offset = 0;
+        self.has_more_deals = true;
+        self.list_state.select(Some(0));
+    }
+
+    /// Check if we're near the end of the list and should load more
+    pub fn should_load_more(&self) -> bool {
+        if !self.has_more_deals || self.loading || self.loading_more {
+            return false;
+        }
+        let filtered = self.filtered_deals();
+        let total = filtered.len();
+        if total == 0 {
+            return false;
+        }
+        if let Some(selected) = self.list_state.selected() {
+            // Load more when within threshold items of the end
+            selected >= total.saturating_sub(self.load_more_threshold)
+        } else {
+            false
+        }
+    }
+
     pub fn tick_spinner(&mut self) {
         self.spinner_frame = (self.spinner_frame + 1) % 10;
     }
@@ -384,6 +443,7 @@ impl App {
         // Reset options navigation when closing
         self.options.platform_list_index = 0;
         self.options.region_list_index = 0;
+        self.options.advanced_list_index = 0;
     }
 
     // Options navigation
@@ -391,6 +451,7 @@ impl App {
         self.options.current_tab = (self.options.current_tab + 1) % OptionsTab::ALL.len();
         self.options.platform_list_index = 0;
         self.options.region_list_index = 0;
+        self.options.advanced_list_index = 0;
     }
 
     pub fn options_prev_tab(&mut self) {
@@ -401,6 +462,7 @@ impl App {
         }
         self.options.platform_list_index = 0;
         self.options.region_list_index = 0;
+        self.options.advanced_list_index = 0;
     }
 
     /// Get platforms without "All" (for the checkbox list)
@@ -422,6 +484,10 @@ impl App {
                 let total_items = 1 + Self::platforms_without_all().len();
                 self.options.platform_list_index = (self.options.platform_list_index + 1) % total_items;
             }
+            OptionsTab::Advanced => {
+                // 3 settings: page size, load threshold, game info delay
+                self.options.advanced_list_index = (self.options.advanced_list_index + 1) % 3;
+            }
         }
     }
 
@@ -440,6 +506,13 @@ impl App {
                     self.options.platform_list_index = total_items - 1;
                 } else {
                     self.options.platform_list_index -= 1;
+                }
+            }
+            OptionsTab::Advanced => {
+                if self.options.advanced_list_index == 0 {
+                    self.options.advanced_list_index = 2; // 3 items (0, 1, 2)
+                } else {
+                    self.options.advanced_list_index -= 1;
                 }
             }
         }
@@ -476,6 +549,43 @@ impl App {
                     }
                 }
                 // Save after any change
+                self.options.save_to_config();
+            }
+            OptionsTab::Advanced => {
+                // Cycle through preset values for each setting
+                match self.options.advanced_list_index {
+                    0 => {
+                        // Page size: cycle through 25, 50, 100, 200
+                        self.options.deals_page_size = match self.options.deals_page_size {
+                            25 => 50,
+                            50 => 100,
+                            100 => 200,
+                            _ => 25,
+                        };
+                        self.deals_page_size = self.options.deals_page_size;
+                    }
+                    1 => {
+                        // Load threshold: cycle through 5, 10, 15, 20
+                        self.options.load_more_threshold = match self.options.load_more_threshold {
+                            5 => 10,
+                            10 => 15,
+                            15 => 20,
+                            _ => 5,
+                        };
+                        self.load_more_threshold = self.options.load_more_threshold;
+                    }
+                    2 => {
+                        // Game info delay: cycle through 100, 200, 300, 500
+                        self.options.game_info_delay_ms = match self.options.game_info_delay_ms {
+                            100 => 200,
+                            200 => 300,
+                            300 => 500,
+                            _ => 100,
+                        };
+                        self.game_info_delay_ms = self.options.game_info_delay_ms;
+                    }
+                    _ => {}
+                }
                 self.options.save_to_config();
             }
         }

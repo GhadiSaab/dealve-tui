@@ -6,6 +6,7 @@ impl ItadClient {
         &self,
         country: &str,
         limit: usize,
+        offset: usize,
         shop_id: Option<u32>,
     ) -> Result<Vec<Deal>> {
         let api_key = self.api_key().ok_or_else(|| {
@@ -18,6 +19,7 @@ impl ItadClient {
             ("key", api_key.to_string()),
             ("country", country.to_string()),
             ("limit", limit.to_string()),
+            ("offset", offset.to_string()),
         ];
 
         if let Some(id) = shop_id {

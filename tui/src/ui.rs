@@ -188,12 +188,25 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
     let total_items = filtered_deals.len();
     let selected = app.list_state.selected().unwrap_or(0);
 
+    // Counter for bottom right corner (white and bold)
+    // Show loading indicator or "+" if more deals available
+    let counter_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
+    let counter_text = if app.loading_more {
+        format!(" {}/{}  {} ", selected + 1, total_items, app.spinner_char())
+    } else if app.has_more_deals {
+        format!(" {}/{}+ ", selected + 1, total_items)
+    } else {
+        format!(" {}/{} ", selected + 1, total_items)
+    };
+    let counter = Span::styled(counter_text, Style::default().fg(counter_color).add_modifier(Modifier::BOLD));
+
     let deals_list = List::new(items)
         .block(Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(&title, Style::default().fg(title_color)))
-            .title_bottom(status_line))
+            .title_bottom(status_line)
+            .title_bottom(Line::from(counter).alignment(Alignment::Right)))
         .highlight_style(highlight_style)
         .highlight_symbol("> ");
 
@@ -530,6 +543,7 @@ fn render_options_popup(frame: &mut Frame, app: &App) {
     match OptionsTab::ALL[app.options.current_tab] {
         OptionsTab::Region => render_region_tab(frame, app, content_area),
         OptionsTab::Platforms => render_platforms_tab(frame, app, content_area),
+        OptionsTab::Advanced => render_advanced_tab(frame, app, content_area),
     }
 }
 
@@ -671,6 +685,75 @@ fn render_platforms_tab(frame: &mut Frame, app: &App, area: Rect) {
     // Help text
     let help = Paragraph::new(Line::from(Span::styled(
         "[Enter] Toggle  [Tab] Switch tab  [Esc] Close",
+        Style::default().fg(TEXT_SECONDARY),
+    )));
+    frame.render_widget(help, chunks[2]);
+}
+
+fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
+    // Split area: description + settings list + help
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),  // Description
+            Constraint::Min(5),     // Settings list
+            Constraint::Length(2),  // Help text
+        ])
+        .split(area);
+
+    // Description
+    let desc = Paragraph::new(Line::from(Span::styled(
+        "Performance and pagination settings:",
+        Style::default().fg(TEXT_SECONDARY),
+    )));
+    frame.render_widget(desc, chunks[0]);
+
+    // Settings list
+    let settings = [
+        ("Page Size", format!("{}", app.options.deals_page_size), "Deals loaded per batch"),
+        ("Load Threshold", format!("{}", app.options.load_more_threshold), "Items from end to trigger load"),
+        ("Info Delay", format!("{}ms", app.options.game_info_delay_ms), "Debounce for game info"),
+    ];
+
+    let mut setting_lines: Vec<Line> = Vec::new();
+    for (i, (name, value, desc)) in settings.iter().enumerate() {
+        let is_selected = app.options.advanced_list_index == i;
+
+        let line_style = if is_selected {
+            Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+        } else {
+            Style::default().fg(TEXT_PRIMARY)
+        };
+
+        let value_style = if is_selected {
+            Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)
+        };
+
+        let desc_style = if is_selected {
+            Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+        } else {
+            Style::default().fg(TEXT_SECONDARY)
+        };
+
+        setting_lines.push(Line::from(vec![
+            Span::styled(format!(" {}: ", name), line_style),
+            Span::styled(format!("{:<6}", value), value_style),
+            Span::styled(format!(" ({})", desc), desc_style),
+        ]));
+    }
+
+    let settings_list = Paragraph::new(setting_lines)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(PURPLE_ACCENT))
+            .title(Span::styled(" Settings ", Style::default().fg(PURPLE_LIGHT))));
+    frame.render_widget(settings_list, chunks[1]);
+
+    // Help text
+    let help = Paragraph::new(Line::from(Span::styled(
+        "[Enter] Cycle value  [Tab] Switch tab  [Esc] Close",
         Style::default().fg(TEXT_SECONDARY),
     )));
     frame.render_widget(help, chunks[2]);

@@ -50,25 +50,40 @@ fn restore_terminal() -> Result<()> {
 }
 
 /// Spawn a background task to load deals (non-blocking)
-fn spawn_deals_load(platform_filter: Platform, region_code: String) -> DealsLoadTask {
+fn spawn_deals_load(platform_filter: Platform, region_code: String, offset: usize, page_size: usize) -> DealsLoadTask {
     let api_key = env::var("ITAD_API_KEY").ok();
     tokio::spawn(async move {
         let client = dealve_api::ItadClient::new(api_key);
         let shop_id = platform_filter.shop_id();
-        client.get_deals(&region_code, 50, shop_id).await
+        client.get_deals(&region_code, page_size, offset, shop_id).await
     })
 }
 
 /// Check if load task is finished and handle result
-async fn check_load_task(app: &mut App, load_task: &mut Option<DealsLoadTask>) -> bool {
+/// Returns true if task completed (for initial load)
+async fn check_load_task(app: &mut App, load_task: &mut Option<DealsLoadTask>, is_loading_more: bool) -> bool {
     if let Some(task) = load_task.as_mut() {
         if task.is_finished() {
             // Task finished, get result
             let task = load_task.take().unwrap();
+            let page_size = app.deals_page_size;
             match task.await {
-                Ok(Ok(deals)) => {
-                    app.deals = deals;
-                    app.list_state.select(Some(0));
+                Ok(Ok(new_deals)) => {
+                    // Check if we got fewer deals than requested (no more available)
+                    if new_deals.len() < page_size {
+                        app.has_more_deals = false;
+                    }
+
+                    if is_loading_more {
+                        // Append to existing deals
+                        app.deals.extend(new_deals);
+                        app.deals_offset += page_size;
+                    } else {
+                        // Replace deals (initial load or filter change)
+                        app.deals = new_deals;
+                        app.deals_offset = page_size;
+                        app.list_state.select(Some(0));
+                    }
                     app.error = None;
                 }
                 Ok(Err(e)) => {
@@ -78,7 +93,11 @@ async fn check_load_task(app: &mut App, load_task: &mut Option<DealsLoadTask>) -
                     app.error = Some("Task failed".to_string());
                 }
             }
-            app.set_loading(false);
+            if is_loading_more {
+                app.loading_more = false;
+            } else {
+                app.set_loading(false);
+            }
             return true; // Task completed
         }
     }
@@ -93,7 +112,12 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
     let mut load_task: Option<DealsLoadTask> = Some(spawn_deals_load(
         app.platform_filter,
         app.region.code().to_string(),
+        0,
+        app.deals_page_size,
     ));
+
+    // Task for loading more deals (pagination)
+    let mut load_more_task: Option<DealsLoadTask> = None;
 
     // Track when selection changed to debounce game info loading
     let mut last_selection_change = std::time::Instant::now();
@@ -106,19 +130,33 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
             break;
         }
 
-        // Check if load task completed
-        if check_load_task(&mut app, &mut load_task).await {
+        // Check if initial/refresh load task completed
+        if check_load_task(&mut app, &mut load_task, false).await {
             last_selection_change = std::time::Instant::now();
             pending_game_info_load = true;
         }
 
+        // Check if load-more task completed
+        check_load_task(&mut app, &mut load_more_task, true).await;
+
+        // Check if we should load more deals (infinite scroll)
+        if app.should_load_more() && load_more_task.is_none() && load_task.is_none() {
+            app.loading_more = true;
+            load_more_task = Some(spawn_deals_load(
+                app.platform_filter,
+                app.region.code().to_string(),
+                app.deals_offset,
+                app.deals_page_size,
+            ));
+        }
+
         // Tick spinner if loading
-        if app.loading {
+        if app.loading || app.loading_more {
             app.tick_spinner();
         }
 
-        // Check if we should load game info (after 200ms of no selection change)
-        if pending_game_info_load && !app.loading && last_selection_change.elapsed() >= std::time::Duration::from_millis(200) {
+        // Check if we should load game info (after debounce delay)
+        if pending_game_info_load && !app.loading && last_selection_change.elapsed() >= std::time::Duration::from_millis(app.game_info_delay_ms) {
             pending_game_info_load = false;
             app.load_game_info_for_selected().await;
         }
@@ -134,10 +172,13 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                             KeyCode::Enter => {
                                 let needs_reload = app.platform_popup_select();
                                 if needs_reload && load_task.is_none() {
+                                    app.reset_pagination();
                                     app.set_loading(true);
                                     load_task = Some(spawn_deals_load(
                                         app.platform_filter,
                                         app.region.code().to_string(),
+                                        0,
+                                        app.deals_page_size,
                                     ));
                                 }
                             }
@@ -155,10 +196,13 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                                 if needs_reload {
                                     app.close_popup();
                                     if load_task.is_none() {
+                                        app.reset_pagination();
                                         app.set_loading(true);
                                         load_task = Some(spawn_deals_load(
                                             app.platform_filter,
                                             app.region.code().to_string(),
+                                            0,
+                                            app.deals_page_size,
                                         ));
                                     }
                                 }
@@ -199,10 +243,13 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                             KeyCode::Enter => app.open_selected_deal(),
                             KeyCode::Char('r') => {
                                 if load_task.is_none() {
+                                    app.reset_pagination();
                                     app.set_loading(true);
                                     load_task = Some(spawn_deals_load(
                                         app.platform_filter,
                                         app.region.code().to_string(),
+                                        0,
+                                        app.deals_page_size,
                                     ));
                                 }
                             }
