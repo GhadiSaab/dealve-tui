@@ -12,7 +12,7 @@ path = "src/main.rs"
 dealve-core = { path = "../core" }
 dealve-api = { path = "../api" }
 tokio = { version = "1.42", features = ["full"] }
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = "0.28"
 anyhow = "1.0"
 tracing = "0.1"
