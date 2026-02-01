@@ -79,7 +79,7 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
     // When dimmed, ALL colors become TEXT_DIMMED
     let text_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
     let border_color = if dimmed { TEXT_DIMMED } else { PURPLE_ACCENT };
-    let title_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
+    let title_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
 
     // Build title " Deals [Platform] "
     let title = format!(" Deals [{}] ", app.platform_filter.name());
@@ -256,7 +256,7 @@ fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
     let text_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
     let label_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
     let border_color = if dimmed { TEXT_DIMMED } else { PURPLE_ACCENT };
-    let title_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
+    let title_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
     let purple_color = if dimmed { TEXT_DIMMED } else { PURPLE_PRIMARY };
     let green_color = if dimmed { TEXT_DIMMED } else { ACCENT_GREEN };
     let yellow_color = if dimmed { TEXT_DIMMED } else { ACCENT_YELLOW };
@@ -393,7 +393,7 @@ fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
 fn render_price_chart(frame: &mut Frame, _app: &App, area: Rect, dimmed: bool) {
     let text_color = if dimmed { TEXT_DIMMED } else { TEXT_SECONDARY };
     let border_color = if dimmed { TEXT_DIMMED } else { PURPLE_ACCENT };
-    let title_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
+    let title_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
 
     let block = Block::default()
         .borders(Borders::ALL)
