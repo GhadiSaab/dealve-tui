@@ -49,6 +49,10 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
 
     app.load_deals().await;
 
+    // Track when selection changed to debounce game info loading
+    let mut last_selection_change = std::time::Instant::now();
+    let mut pending_load = false;
+
     loop {
         terminal.draw(|frame| ui::render(frame, &mut app))?;
 
@@ -56,7 +60,13 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
             break;
         }
 
-        if event::poll(std::time::Duration::from_millis(100))? {
+        // Check if we should load game info (after 200ms of no selection change)
+        if pending_load && last_selection_change.elapsed() >= std::time::Duration::from_millis(200) {
+            pending_load = false;
+            app.load_game_info_for_selected().await;
+        }
+
+        if event::poll(std::time::Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     if app.popup != Popup::None {
@@ -86,12 +96,22 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                     } else {
                         match key.code {
                             KeyCode::Esc => app.toggle_menu(),
-                            KeyCode::Down | KeyCode::Char('j') => app.next(),
-                            KeyCode::Up | KeyCode::Char('k') => app.previous(),
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                app.next();
+                                last_selection_change = std::time::Instant::now();
+                                pending_load = true;
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                app.previous();
+                                last_selection_change = std::time::Instant::now();
+                                pending_load = true;
+                            }
                             KeyCode::Char('f') => app.toggle_dropdown(),
                             KeyCode::Enter => app.open_selected_deal(),
                             KeyCode::Char('r') => {
                                 app.load_deals().await;
+                                last_selection_change = std::time::Instant::now();
+                                pending_load = true;
                             }
                             _ => {}
                         }

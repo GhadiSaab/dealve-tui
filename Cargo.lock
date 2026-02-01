@@ -233,6 +233,7 @@ name = "dealve-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "dealve-core",
  "dotenvy",
  "reqwest",

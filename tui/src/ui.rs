@@ -1,12 +1,22 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect, Alignment},
-    style::{Color, Style},
+    style::{Color, Style, Modifier},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
 use crate::app::{App, MenuItem, Popup};
+
+// Dealve color palette - Pastel theme (light colors for dark background)
+const PURPLE_PRIMARY: Color = Color::Rgb(200, 160, 255);   // Pastel lavender - main brand color
+const PURPLE_LIGHT: Color = Color::Rgb(220, 190, 255);     // Lighter pastel lavender - highlights
+const PURPLE_ACCENT: Color = Color::Rgb(180, 130, 255);    // Slightly stronger pastel for accents
+const ACCENT_GREEN: Color = Color::Rgb(150, 230, 150);     // Pastel mint green - good deals
+const ACCENT_YELLOW: Color = Color::Rgb(255, 230, 150);    // Pastel gold/cream - medium deals
+const TEXT_PRIMARY: Color = Color::White;
+const TEXT_SECONDARY: Color = Color::Rgb(180, 180, 180);   // Light gray
+const TEXT_DIMMED: Color = Color::Rgb(90, 90, 90);         // Dimmed text for background when menu open
 
 const ASCII_LOGO: [&str; 6] = [
     "██████╗ ███████╗ █████╗ ██╗    ██╗   ██╗███████╗",
@@ -19,7 +29,7 @@ const ASCII_LOGO: [&str; 6] = [
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     let dimmed = app.show_menu;
-    render_deals(frame, app, dimmed);
+    render_main(frame, app, dimmed);
 
     if app.show_menu {
         render_menu_overlay(frame, app);
@@ -30,6 +40,309 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         Popup::Options => render_options_popup(frame),
         Popup::Keybinds => render_keybinds_popup(frame),
     }
+}
+
+fn render_main(frame: &mut Frame, app: &mut App, dimmed: bool) {
+    let area = frame.area();
+
+    // Split horizontal: 50% left (deals), 50% right (details + chart)
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    let left_panel = main_chunks[0];
+
+    // Right panel: split vertical - details (40%), chart (60%)
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .split(main_chunks[1]);
+
+    let details_panel = right_chunks[0];
+    let chart_panel = right_chunks[1];
+
+    render_deals_list(frame, app, left_panel, dimmed);
+    render_game_details(frame, app, details_panel, dimmed);
+    render_price_chart(frame, app, chart_panel, dimmed);
+
+    if app.show_platform_dropdown {
+        render_dropdown(frame, app, left_panel);
+    }
+}
+
+fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool) {
+    // When dimmed, ALL colors become TEXT_DIMMED
+    let text_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
+    let border_color = if dimmed { TEXT_DIMMED } else { PURPLE_ACCENT };
+    let title_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
+
+    if app.loading {
+        let loading = Paragraph::new("Loading deals...")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(text_color))
+            .block(Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color))
+                .title(format!(" Deals [{}] ", app.platform_filter.name())));
+        frame.render_widget(loading, area);
+        return;
+    }
+
+    if let Some(error) = &app.error {
+        let error_msg = Paragraph::new(format!("Error: {}", error))
+            .style(Style::default().fg(Color::Red))
+            .block(Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color))
+                .title(" Error "));
+        frame.render_widget(error_msg, area);
+        return;
+    }
+
+    let filtered_deals = app.filtered_deals();
+
+    if filtered_deals.is_empty() {
+        let empty = Paragraph::new("No deals found")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(text_color))
+            .block(Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color))
+                .title(format!(" Deals [{}] ", app.platform_filter.name())));
+        frame.render_widget(empty, area);
+        return;
+    }
+
+    let items: Vec<ListItem> = filtered_deals
+        .iter()
+        .map(|deal| {
+            let price_str = format!("{}{:.2}", deal.price.currency_symbol(), deal.price.amount);
+            let discount_str = format!("-{}%", deal.price.discount);
+
+            // Calculate available width for title
+            let available_width = area.width.saturating_sub(20) as usize;
+            let title = truncate(&deal.title, available_width);
+
+            // Check if this is an all-time low - highlight in purple!
+            let is_atl = deal.history_low
+                .map(|low| (low - deal.price.amount).abs() < 0.01)
+                .unwrap_or(false);
+
+            // Color scheme based on deal quality (respects dimmed state)
+            let (item_title_color, price_color, discount_color) = if dimmed {
+                (TEXT_DIMMED, TEXT_DIMMED, TEXT_DIMMED)
+            } else if is_atl {
+                // All-time low: purple theme
+                (PURPLE_LIGHT, PURPLE_PRIMARY, PURPLE_PRIMARY)
+            } else if deal.price.discount >= 75 {
+                (text_color, ACCENT_GREEN, ACCENT_GREEN)
+            } else if deal.price.discount >= 50 {
+                (text_color, ACCENT_YELLOW, ACCENT_YELLOW)
+            } else {
+                (text_color, text_color, TEXT_SECONDARY)
+            };
+
+            let mut spans = vec![
+                Span::styled(format!("{:<width$}", title, width = available_width), Style::default().fg(item_title_color)),
+                Span::styled(format!("{:>8}", price_str), Style::default().fg(price_color)),
+                Span::styled(format!("{:>6}", discount_str), Style::default().fg(discount_color)),
+            ];
+
+            // Add ATL indicator
+            if is_atl {
+                let atl_color = if dimmed { TEXT_DIMMED } else { PURPLE_PRIMARY };
+                spans.push(Span::styled(" ATL", Style::default().fg(atl_color).add_modifier(Modifier::BOLD)));
+            }
+
+            let content = Line::from(spans);
+            ListItem::new(content)
+        })
+        .collect();
+
+    let highlight_style = if dimmed {
+        Style::default().fg(TEXT_DIMMED)
+    } else {
+        Style::default().bg(PURPLE_ACCENT).fg(TEXT_PRIMARY)
+    };
+
+    let deals_list = List::new(items)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(border_color))
+            .title(Span::styled(
+                format!(" Deals [{}] ", app.platform_filter.name()),
+                Style::default().fg(title_color)
+            )))
+        .highlight_style(highlight_style)
+        .highlight_symbol("> ");
+
+    frame.render_stateful_widget(deals_list, area, &mut app.list_state);
+}
+
+fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
+    // When dimmed, ALL colors become TEXT_DIMMED
+    let text_color = if dimmed { TEXT_DIMMED } else { TEXT_PRIMARY };
+    let label_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
+    let border_color = if dimmed { TEXT_DIMMED } else { PURPLE_ACCENT };
+    let title_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
+    let purple_color = if dimmed { TEXT_DIMMED } else { PURPLE_PRIMARY };
+    let green_color = if dimmed { TEXT_DIMMED } else { ACCENT_GREEN };
+    let yellow_color = if dimmed { TEXT_DIMMED } else { ACCENT_YELLOW };
+    let secondary_color = if dimmed { TEXT_DIMMED } else { TEXT_SECONDARY };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border_color))
+        .title(Span::styled(" Game Details ", Style::default().fg(title_color)));
+
+    // Get selected deal for basic info
+    let selected_deal = app.selected_deal();
+
+    if selected_deal.is_none() {
+        let empty = Paragraph::new("Select a deal to view details")
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(secondary_color))
+            .block(block);
+        frame.render_widget(empty, area);
+        return;
+    }
+
+    let deal = selected_deal.unwrap();
+    let game_info = app.selected_game_info();
+    let is_loading = app.loading_game_info.as_ref() == Some(&deal.id);
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Check if ATL
+    let is_atl = deal.history_low
+        .map(|low| (low - deal.price.amount).abs() < 0.01)
+        .unwrap_or(false);
+
+    // Title with ATL badge if applicable
+    if is_atl {
+        lines.push(Line::from(vec![
+            Span::styled(">> ALL-TIME LOW <<", Style::default().fg(purple_color).add_modifier(Modifier::BOLD)),
+        ]));
+        lines.push(Line::from("")); // Spacer
+    }
+
+    // Title
+    lines.push(Line::from(vec![
+        Span::styled(&deal.title, Style::default().fg(text_color).add_modifier(Modifier::BOLD)),
+    ]));
+
+    // Release date and developers from game info
+    if let Some(info) = game_info {
+        if let Some(ref release_date) = info.release_date {
+            lines.push(Line::from(vec![
+                Span::styled("Released: ", Style::default().fg(label_color)),
+                Span::styled(release_date, Style::default().fg(secondary_color)),
+            ]));
+        }
+        if !info.developers.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Developer: ", Style::default().fg(label_color)),
+                Span::styled(info.developers.join(", "), Style::default().fg(secondary_color)),
+            ]));
+        }
+        if !info.publishers.is_empty() && info.publishers != info.developers {
+            lines.push(Line::from(vec![
+                Span::styled("Publisher: ", Style::default().fg(label_color)),
+                Span::styled(info.publishers.join(", "), Style::default().fg(secondary_color)),
+            ]));
+        }
+    } else if is_loading {
+        lines.push(Line::from(vec![
+            Span::styled("Loading game info...", Style::default().fg(secondary_color)),
+        ]));
+    }
+
+    lines.push(Line::from("")); // Spacer
+
+    // Shop
+    lines.push(Line::from(vec![
+        Span::styled("Shop: ", Style::default().fg(label_color)),
+        Span::styled(&deal.shop.name, Style::default().fg(text_color)),
+    ]));
+
+    // Price section
+    let regular_str = format!("{}{:.2}", deal.price.currency_symbol(), deal.regular_price);
+    let price_str = format!("{}{:.2}", deal.price.currency_symbol(), deal.price.amount);
+    let discount_str = format!("-{}%", deal.price.discount);
+    let price_color = if is_atl { purple_color } else { green_color };
+
+    lines.push(Line::from(vec![
+        Span::styled(regular_str, Style::default().fg(secondary_color).add_modifier(Modifier::CROSSED_OUT)),
+        Span::styled(" -> ", Style::default().fg(secondary_color)),
+        Span::styled(price_str, Style::default().fg(price_color).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" ({})", discount_str), Style::default().fg(yellow_color)),
+    ]));
+
+    // Savings
+    let savings = deal.regular_price - deal.price.amount;
+    if savings > 0.0 {
+        let savings_str = format!("{}{:.2}", deal.price.currency_symbol(), savings);
+        lines.push(Line::from(vec![
+            Span::styled("You save ", Style::default().fg(secondary_color)),
+            Span::styled(savings_str, Style::default().fg(green_color).add_modifier(Modifier::BOLD)),
+        ]));
+    }
+
+    // History low
+    if let Some(low) = deal.history_low {
+        let low_str = format!("{}{:.2}", deal.price.currency_symbol(), low);
+        let low_price_color = if is_atl { purple_color } else { text_color };
+        lines.push(Line::from(vec![
+            Span::styled("History low: ", Style::default().fg(label_color)),
+            Span::styled(low_str, Style::default().fg(low_price_color)),
+            if is_atl && !dimmed {
+                Span::styled(" (current!)", Style::default().fg(purple_color))
+            } else {
+                Span::raw("")
+            },
+        ]));
+    }
+
+    // Tags from game info
+    if let Some(info) = game_info {
+        if !info.tags.is_empty() {
+            lines.push(Line::from("")); // Spacer
+            let tags_str = info.tags.iter().take(5).cloned().collect::<Vec<_>>().join(" | ");
+            lines.push(Line::from(vec![
+                Span::styled(tags_str, Style::default().fg(secondary_color)),
+            ]));
+        }
+    }
+
+    let paragraph = Paragraph::new(lines).block(block);
+    frame.render_widget(paragraph, area);
+}
+
+fn render_price_chart(frame: &mut Frame, _app: &App, area: Rect, dimmed: bool) {
+    let text_color = if dimmed { TEXT_DIMMED } else { TEXT_SECONDARY };
+    let border_color = if dimmed { TEXT_DIMMED } else { PURPLE_ACCENT };
+    let title_color = if dimmed { TEXT_DIMMED } else { PURPLE_LIGHT };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border_color))
+        .title(Span::styled(" Price History ", Style::default().fg(title_color)));
+
+    // Price history chart placeholder
+    let content = vec![
+        "",
+        "  Price history chart coming soon...",
+        "",
+        "  Visit IsThereAnyDeal.com for full",
+        "  price history information.",
+    ];
+
+    let placeholder = Paragraph::new(content.join("\n"))
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(text_color))
+        .block(block);
+
+    frame.render_widget(placeholder, area);
 }
 
 fn render_menu_overlay(frame: &mut Frame, app: &App) {
@@ -48,13 +361,13 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, logo_area);
 
+    // Logo in purple gradient effect
     let logo_lines: Vec<Line> = ASCII_LOGO
         .iter()
-        .map(|line| Line::from(*line))
+        .map(|line| Line::from(Span::styled(*line, Style::default().fg(PURPLE_PRIMARY))))
         .collect();
     let logo = Paragraph::new(logo_lines)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::White));
+        .alignment(Alignment::Center);
     frame.render_widget(logo, logo_area);
 
     let menu_x = area.width.saturating_sub(menu_width) / 2;
@@ -68,9 +381,9 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
         .enumerate()
         .map(|(i, item)| {
             let style = if i == app.menu_selected {
-                Style::default().bg(Color::DarkGray).fg(Color::White)
+                Style::default().bg(PURPLE_PRIMARY).fg(TEXT_PRIMARY).add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::Gray)
+                Style::default().fg(TEXT_SECONDARY)
             };
             let prefix = if i == app.menu_selected { "> " } else { "  " };
             ListItem::new(format!("{}{}", prefix, item.name())).style(style)
@@ -78,7 +391,9 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
         .collect();
 
     let menu = List::new(items)
-        .block(Block::default().borders(Borders::ALL).style(Style::default()));
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(PURPLE_LIGHT)));
 
     frame.render_widget(menu, menu_area);
 }
@@ -101,10 +416,11 @@ fn render_options_popup(frame: &mut Frame) {
     ];
 
     let popup = Paragraph::new(content.join("\n"))
+        .style(Style::default().fg(TEXT_PRIMARY))
         .block(Block::default()
-            .title(" Options ")
+            .title(Span::styled(" Options ", Style::default().fg(PURPLE_LIGHT)))
             .borders(Borders::ALL)
-            .style(Style::default()));
+            .border_style(Style::default().fg(PURPLE_PRIMARY)));
 
     frame.render_widget(popup, popup_area);
 }
@@ -121,132 +437,33 @@ fn render_keybinds_popup(frame: &mut Frame) {
 
     let content = vec![
         "",
-        "  [↑/↓] or [j/k]  Navigate",
-        "  [Enter]         Open deal / Select",
-        "  [f]             Open platform filter",
-        "  [r]             Refresh deals",
-        "  [Esc]           Menu / Close popup",
-        "  [q]             Quit (from menu)",
+        "  [Up/Down] or [j/k]  Navigate",
+        "  [Enter]             Open deal / Select",
+        "  [f]                 Open platform filter",
+        "  [r]                 Refresh deals",
+        "  [Esc]               Menu / Close popup",
+        "  [q]                 Quit (from menu)",
         "",
         "  [Esc] Close",
     ];
 
     let popup = Paragraph::new(content.join("\n"))
+        .style(Style::default().fg(TEXT_PRIMARY))
         .block(Block::default()
-            .title(" Keybinds ")
+            .title(Span::styled(" Keybinds ", Style::default().fg(PURPLE_LIGHT)))
             .borders(Borders::ALL)
-            .style(Style::default()));
+            .border_style(Style::default().fg(PURPLE_PRIMARY)));
 
     frame.render_widget(popup, popup_area);
 }
 
-fn render_deals(frame: &mut Frame, app: &mut App, dimmed: bool) {
-    let area = centered_rect(85, 90, frame.area());
-    let text_color = if dimmed { Color::DarkGray } else { Color::White };
-    let bar_color = if dimmed { Color::Rgb(60, 60, 60) } else { Color::White };
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(0),
-            Constraint::Length(3),
-        ])
-        .split(area);
-
-    let title_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(text_color))
-        .title("─ Dealve TUI ─");
-
-    let filter_text = format!("🔥 Top Deals  [Filter: {}]", app.platform_filter.name());
-    let title = Paragraph::new(filter_text)
-        .style(Style::default().fg(text_color))
-        .block(title_block);
-    frame.render_widget(title, chunks[0]);
-
-    if app.loading {
-        let loading = Paragraph::new("Loading deals...")
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(text_color))
-            .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(text_color)));
-        frame.render_widget(loading, chunks[1]);
-    } else if let Some(error) = &app.error {
-        let error_msg = Paragraph::new(format!("Error: {}", error))
-            .style(Style::default().fg(text_color))
-            .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(text_color)).title("Error"));
-        frame.render_widget(error_msg, chunks[1]);
-    } else {
-        let filtered_deals = app.filtered_deals();
-
-        if filtered_deals.is_empty() {
-            let empty = Paragraph::new("No deals found for this platform")
-                .alignment(Alignment::Center)
-                .style(Style::default().fg(text_color))
-                .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(text_color)));
-            frame.render_widget(empty, chunks[1]);
-        } else {
-            let items: Vec<ListItem> = filtered_deals
-                .iter()
-                .map(|deal| {
-
-                let discount_bar = create_discount_bar(deal.price.discount, bar_color);
-
-                let low_info = if let Some(low) = deal.history_low {
-                    if (low - deal.price.amount).abs() < 0.01 {
-                        "ATL! 🏆".to_string()
-                    } else {
-                        format!("Low: {}{:.2}", deal.price.currency_symbol(), low)
-                    }
-                } else {
-                    String::new()
-                };
-
-                let price_str = format!("{}{:.2}", deal.price.currency_symbol(), deal.price.amount);
-                let discount_str = format!("-{}%", deal.price.discount);
-
-                let content = Line::from(vec![
-                    Span::styled(format!("{:<50}", truncate(&deal.title, 50)), Style::default().fg(text_color)),
-                    Span::styled(format!("{:>8}", price_str), Style::default().fg(text_color)),
-                    Span::styled("  ", Style::default().fg(text_color)),
-                    Span::styled(format!("{:>4}", discount_str), Style::default().fg(text_color)),
-                    Span::styled("  ", Style::default().fg(text_color)),
-                    Span::styled(discount_bar, Style::default().fg(bar_color)),
-                    Span::styled(" ", Style::default().fg(text_color)),
-                    Span::styled(format!("{:<13}", low_info), Style::default().fg(text_color)),
-                ]);
-
-                ListItem::new(content)
-                })
-                .collect();
-
-            let deals_list = List::new(items)
-                .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(text_color)))
-                .highlight_style(Style::default().bg(Color::DarkGray))
-                .highlight_symbol("> ");
-
-            frame.render_stateful_widget(deals_list, chunks[1], &mut app.list_state);
-        }
-    }
-
-    let help = Paragraph::new("[↑/↓] Navigate  [f] Filter  [Enter] Open  [r] Refresh  [Esc] Menu")
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(text_color))
-        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(text_color)));
-    frame.render_widget(help, chunks[2]);
-
-    if app.show_platform_dropdown {
-        render_dropdown(frame, app, chunks[0]);
-    }
-}
-
-fn render_dropdown(frame: &mut Frame, app: &mut App, title_area: Rect) {
+fn render_dropdown(frame: &mut Frame, app: &mut App, list_area: Rect) {
     let dropdown_width = 20u16;
     let max_visible = 15u16;
     let dropdown_height = max_visible + 2;
 
-    let dropdown_x = title_area.x + 20;
-    let dropdown_y = title_area.y + title_area.height;
+    let dropdown_x = list_area.x + 2;
+    let dropdown_y = list_area.y + 1;
 
     let frame_height = frame.area().height;
     let available_height = frame_height.saturating_sub(dropdown_y);
@@ -265,6 +482,7 @@ fn render_dropdown(frame: &mut Frame, app: &mut App, title_area: Rect) {
         .iter()
         .map(|platform| {
             ListItem::new(format!("  {}", platform.name()))
+                .style(Style::default().fg(TEXT_PRIMARY))
         })
         .collect();
 
@@ -272,45 +490,22 @@ fn render_dropdown(frame: &mut Frame, app: &mut App, title_area: Rect) {
     list_state.select(Some(app.dropdown_selected));
 
     let dropdown = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Platform"))
-        .highlight_style(Style::default().bg(Color::DarkGray))
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(PURPLE_ACCENT))
+            .title(Span::styled(" Platform ", Style::default().fg(PURPLE_LIGHT))))
+        .highlight_style(Style::default().bg(PURPLE_ACCENT).fg(TEXT_PRIMARY))
         .highlight_symbol("> ");
 
     frame.render_stateful_widget(dropdown, dropdown_area, &mut list_state);
 }
 
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
-
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
-}
-
-fn create_discount_bar(discount: u8, _color: Color) -> String {
-    let total = 8;
-    let savings = (((discount as f64 / 100.0) * total as f64).round() as usize).min(total);
-    let paying = total - savings;
-    format!("{}{}", "█".repeat(paying), "░".repeat(savings))
-}
-
 fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
+    if s.chars().count() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len.saturating_sub(3)])
+        let truncated: String = s.chars().take(max_len.saturating_sub(3)).collect();
+        format!("{}...", truncated)
     }
 }
 

@@ -1,6 +1,7 @@
 use dealve_api::ItadClient;
-use dealve_core::models::{Deal, Platform};
+use dealve_core::models::{Deal, GameInfo, Platform};
 use ratatui::widgets::ListState;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuItem {
@@ -47,6 +48,9 @@ pub struct App {
     pub platform_filter: Platform,
     pub show_platform_dropdown: bool,
     pub dropdown_selected: usize,
+    // Game info cache and loading state
+    pub game_info_cache: HashMap<String, GameInfo>,
+    pub loading_game_info: Option<String>,
     client: ItadClient,
 }
 
@@ -68,6 +72,8 @@ impl App {
             platform_filter: Platform::All,
             show_platform_dropdown: false,
             dropdown_selected: 0,
+            game_info_cache: HashMap::new(),
+            loading_game_info: None,
             client: ItadClient::new(api_key),
         }
     }
@@ -217,5 +223,55 @@ impl App {
 
     pub fn close_popup(&mut self) {
         self.popup = Popup::None;
+    }
+
+    pub fn selected_deal(&self) -> Option<&Deal> {
+        self.list_state
+            .selected()
+            .and_then(|i| self.filtered_deals().get(i).copied())
+    }
+
+    pub fn selected_game_info(&self) -> Option<&GameInfo> {
+        self.selected_deal()
+            .and_then(|deal| self.game_info_cache.get(&deal.id))
+    }
+
+    pub fn needs_game_info_load(&self) -> Option<String> {
+        // Check if we need to load game info for current selection
+        if let Some(deal) = self.selected_deal() {
+            if !self.game_info_cache.contains_key(&deal.id)
+                && self.loading_game_info.as_ref() != Some(&deal.id)
+            {
+                return Some(deal.id.clone());
+            }
+        }
+        None
+    }
+
+    pub fn start_loading_game_info(&mut self, game_id: String) {
+        self.loading_game_info = Some(game_id);
+    }
+
+    pub fn finish_loading_game_info(&mut self, game_id: String, info: Option<GameInfo>) {
+        if let Some(info) = info {
+            self.game_info_cache.insert(game_id.clone(), info);
+        }
+        if self.loading_game_info.as_ref() == Some(&game_id) {
+            self.loading_game_info = None;
+        }
+    }
+
+    pub async fn load_game_info_for_selected(&mut self) {
+        if let Some(game_id) = self.needs_game_info_load() {
+            self.start_loading_game_info(game_id.clone());
+            match self.client.get_game_info(&game_id).await {
+                Ok(info) => {
+                    self.finish_loading_game_info(game_id, Some(info));
+                }
+                Err(_) => {
+                    self.finish_loading_game_info(game_id, None);
+                }
+            }
+        }
     }
 }

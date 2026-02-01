@@ -150,11 +150,32 @@ impl Platform {
 /// Represents a game deal from IsThereAnyDeal
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deal {
+    pub id: String,
     pub title: String,
     pub shop: Shop,
     pub price: Price,
+    pub regular_price: f64,
     pub url: String,
     pub history_low: Option<f64>,
+}
+
+/// Detailed game information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameInfo {
+    pub id: String,
+    pub title: String,
+    pub release_date: Option<String>,
+    pub developers: Vec<String>,
+    pub publishers: Vec<String>,
+    pub tags: Vec<String>,
+}
+
+/// Price history data point for charts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PriceHistoryPoint {
+    pub timestamp: i64,
+    pub price: f64,
+    pub shop_name: String,
 }
 
 /// Store/shop information
