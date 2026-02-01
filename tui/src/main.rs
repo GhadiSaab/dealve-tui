@@ -158,6 +158,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                     } else if app.show_menu {
                         match key.code {
                             KeyCode::Esc => app.toggle_menu(),
+                            KeyCode::Char('q') => app.quit(),
                             KeyCode::Down | KeyCode::Char('j') => app.menu_next(),
                             KeyCode::Up | KeyCode::Char('k') => app.menu_previous(),
                             KeyCode::Enter => {
@@ -167,7 +168,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                         }
                     } else {
                         match key.code {
-                            KeyCode::Esc => app.toggle_menu(),
+                            KeyCode::Esc | KeyCode::Char('q') => app.toggle_menu(),
                             KeyCode::Down | KeyCode::Char('j') => {
                                 app.next();
                                 last_selection_change = std::time::Instant::now();
