@@ -9,8 +9,9 @@ use crossterm::{
     ExecutableCommand,
 };
 use dealve_core::models::{Deal, Platform};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{backend::CrosstermBackend, prelude::Color, layout::Rect, Terminal};
 use std::{env, io::{stdout, Stdout}, time::Instant};
+use tachyonfx::{fx, Effect, Interpolation, Motion};
 use tokio::task::JoinHandle;
 
 use app::{App, Popup};
@@ -124,10 +125,25 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
     let mut last_selection_change = Instant::now();
     let mut pending_game_info_load = false;
 
+    // Tachyonfx effects for sweep-in animations
+    let mut effects: Vec<(Effect, Rect)> = Vec::new();
+    let mut last_frame_time = Instant::now();
+
     loop {
+        let elapsed = last_frame_time.elapsed();
+        last_frame_time = Instant::now();
+
         terminal.draw(|frame| {
             ui::render(frame, &mut app);
+
+            // Apply all active effects
+            for (effect, area) in effects.iter_mut() {
+                effect.process(elapsed.into(), frame.buffer_mut(), *area);
+            }
         })?;
+
+        // Remove completed effects
+        effects.retain(|(effect, _)| !effect.done());
 
         if app.should_quit {
             break;
@@ -137,6 +153,20 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
         if check_load_task(&mut app, &mut load_task, false).await {
             last_selection_change = std::time::Instant::now();
             pending_game_info_load = true;
+
+            // Trigger sweep-in effect for deals list (left panel = 50% width)
+            let term_size = terminal.size()?;
+            let deals_area = Rect::new(0, 0, term_size.width / 2, term_size.height);
+            effects.push((
+                fx::sweep_in(
+                    Motion::UpToDown,
+                    15,  // gradient length for smoother wave
+                    3,   // randomness for wave-like effect
+                    Color::Rgb(20, 15, 30),  // BG_DARK color
+                    (600, Interpolation::QuadOut),  // 600ms with ease-out
+                ),
+                deals_area,
+            ));
         }
 
         // Check if load-more task completed
@@ -159,12 +189,19 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
         }
 
         // Check if we should load game info (after debounce delay)
-        if pending_game_info_load && !app.loading && last_selection_change.elapsed() >= std::time::Duration::from_millis(app.game_info_delay_ms) {
+        // Don't load during animations to avoid blocking the render loop
+        if pending_game_info_load && !app.loading && effects.is_empty() && last_selection_change.elapsed() >= std::time::Duration::from_millis(app.game_info_delay_ms) {
             pending_game_info_load = false;
             app.load_game_info_for_selected().await;
         }
 
-        if event::poll(std::time::Duration::from_millis(50))? {
+        // Use shorter poll time during animations for smoother rendering (~60 FPS)
+        let poll_duration = if !effects.is_empty() {
+            std::time::Duration::from_millis(16)
+        } else {
+            std::time::Duration::from_millis(50)
+        };
+        if event::poll(poll_duration)? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     if app.popup == Popup::Platform {
