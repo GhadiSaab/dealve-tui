@@ -11,7 +11,9 @@ use crossterm::{
 use dealve_core::models::{Deal, Platform};
 use ratatui::{backend::CrosstermBackend, prelude::Color, layout::Rect, Terminal};
 use std::{env, io::{stdout, Stdout}, time::Instant};
-use tachyonfx::{fx, Effect, Interpolation, Motion};
+use tachyonfx::{fx, Effect, EffectTimer, Interpolation, Motion};
+use tachyonfx::fx::EvolveSymbolSet;
+use tachyonfx::pattern::RadialPattern;
 use tokio::task::JoinHandle;
 
 use app::{App, Popup};
@@ -125,9 +127,25 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
     let mut last_selection_change = Instant::now();
     let mut pending_game_info_load = false;
 
-    // Tachyonfx effects for sweep-in animations
+    // Tachyonfx effects for animations
     let mut effects: Vec<(Effect, Rect)> = Vec::new();
     let mut last_frame_time = Instant::now();
+
+    // Initial evolve_into effect for app startup
+    let term_size = terminal.size()?;
+    let full_screen = Rect::new(0, 0, term_size.width, term_size.height);
+
+    let style = ratatui::style::Style::default()
+        .fg(Color::Rgb(20, 15, 30))   // BG_DARK
+        .bg(Color::Rgb(10, 8, 15));   // darker bg
+
+    let timer = EffectTimer::from_ms(1200, Interpolation::CubicOut);
+
+    effects.push((
+        fx::evolve_into((EvolveSymbolSet::Shaded, style), timer)
+            .with_pattern(RadialPattern::center().with_transition_width(15.0)),
+        full_screen,
+    ));
 
     loop {
         let elapsed = last_frame_time.elapsed();
