@@ -930,15 +930,6 @@ fn vertical_padding(area_height: u16, text_lines: u16) -> String {
     "\n".repeat(padding as usize)
 }
 
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.chars().count() <= max_len {
-        s.to_string()
-    } else {
-        let truncated: String = s.chars().take(max_len.saturating_sub(3)).collect();
-        format!("{}...", truncated)
-    }
-}
-
 trait CurrencySymbol {
     fn currency_symbol(&self) -> &str;
 }
