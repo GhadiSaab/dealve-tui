@@ -20,6 +20,7 @@ const TEXT_PRIMARY: Color = Color::White;
 const TEXT_SECONDARY: Color = Color::Rgb(180, 180, 180);   // Light gray
 const TEXT_DIMMED: Color = Color::Rgb(90, 90, 90);         // Dimmed text for background when menu open
 const BG_DARK: Color = Color::Rgb(20, 15, 30);             // Very dark purple background
+const BG_HIGHLIGHT: Color = Color::Rgb(60, 45, 90);        // Darker purple for selection highlight
 
 const ASCII_LOGO: [&str; 6] = [
     "██████╗ ███████╗ █████╗ ██╗    ██╗   ██╗███████╗",
@@ -186,7 +187,7 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
     let highlight_style = if dimmed {
         Style::default().fg(TEXT_DIMMED)
     } else {
-        Style::default().bg(PURPLE_ACCENT).fg(TEXT_PRIMARY)
+        Style::default().bg(BG_HIGHLIGHT)
     };
 
     // Save values for scrollbar before render
@@ -582,7 +583,7 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
         .enumerate()
         .map(|(i, item)| {
             let style = if i == app.menu_selected {
-                Style::default().bg(PURPLE_PRIMARY).fg(TEXT_PRIMARY).add_modifier(Modifier::BOLD)
+                Style::default().bg(BG_HIGHLIGHT).fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(TEXT_SECONDARY)
             };
