@@ -236,6 +236,8 @@ pub struct OptionsState {
     // Advanced settings
     pub deals_page_size: usize,
     pub game_info_delay_ms: u64,
+    // Default sort
+    pub default_sort: SortState,
 }
 
 impl Default for OptionsState {
@@ -255,6 +257,7 @@ impl Default for OptionsState {
             region: Region::default(),
             deals_page_size: 50,
             game_info_delay_ms: 200,
+            default_sort: SortState::default(),
         }
     }
 }
@@ -265,6 +268,7 @@ impl OptionsState {
         let enabled_platforms = config.get_enabled_platforms();
         let default_platform = config.get_default_platform();
         let region = config.get_region();
+        let default_sort = config.get_default_sort();
 
         // Ensure default platform is enabled
         let default_platform = if enabled_platforms.contains(&default_platform) {
@@ -283,13 +287,14 @@ impl OptionsState {
             region,
             deals_page_size: config.deals_page_size,
             game_info_delay_ms: config.game_info_delay_ms,
+            default_sort,
         }
     }
 
     /// Save current state to config
     pub fn save_to_config(&self) {
         let mut config = Config::load();
-        config.update_from_options(self.default_platform, &self.enabled_platforms, self.region);
+        config.update_from_options(self.default_platform, &self.enabled_platforms, self.region, self.default_sort);
         config.deals_page_size = self.deals_page_size;
         config.game_info_delay_ms = self.game_info_delay_ms;
         let _ = config.save(); // Ignore errors silently
@@ -352,6 +357,7 @@ impl App {
         let options = OptionsState::from_config(&config);
         let platform_filter = options.default_platform;
         let region = options.region;
+        let sort_state = options.default_sort;
 
         Self {
             show_menu: false,
@@ -371,7 +377,7 @@ impl App {
             loading_price_history: None,
             options,
             spinner_frame: 0,
-            sort_state: SortState::default(),
+            sort_state,
             platform_popup_index: 0,
             deals_offset: 0,
             has_more_deals: true,
@@ -808,6 +814,10 @@ impl App {
                 // Cycle through preset values for each setting
                 match self.options.advanced_list_index {
                     0 => {
+                        // Default sort: cycle through criteria
+                        self.options.default_sort.criteria = self.options.default_sort.criteria.next();
+                    }
+                    1 => {
                         // Page size: cycle through 25, 50, 100, 200
                         self.options.deals_page_size = match self.options.deals_page_size {
                             25 => 50,
@@ -817,7 +827,7 @@ impl App {
                         };
                         self.deals_page_size = self.options.deals_page_size;
                     }
-                    1 => {
+                    2 => {
                         // Game info delay: cycle through 100, 200, 300, 500
                         self.options.game_info_delay_ms = match self.options.game_info_delay_ms {
                             100 => 200,
@@ -833,6 +843,16 @@ impl App {
             }
         }
         needs_reload
+    }
+
+    /// Toggle sort direction for default sort in options (Advanced tab, index 0)
+    pub fn options_toggle_sort_direction(&mut self) {
+        if OptionsTab::ALL[self.options.current_tab] == OptionsTab::Advanced
+            && self.options.advanced_list_index == 0
+        {
+            self.options.default_sort.direction = self.options.default_sort.direction.toggle();
+            self.options.save_to_config();
+        }
     }
 
     fn cycle_default_platform(&mut self) {

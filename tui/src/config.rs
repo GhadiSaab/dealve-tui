@@ -1,3 +1,4 @@
+use crate::app::{SortCriteria, SortDirection, SortState};
 use dealve_core::models::{Platform, Region};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -20,6 +21,12 @@ pub struct Config {
     /// IsThereAnyDeal API key (optional, can also be set via ITAD_API_KEY env var)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    /// Default sort criteria (Price, Cut, Hottest, Release, Expiring, Popular)
+    #[serde(default = "default_sort_criteria")]
+    pub default_sort_criteria: String,
+    /// Default sort direction (Ascending or Descending)
+    #[serde(default = "default_sort_direction")]
+    pub default_sort_direction: String,
 }
 
 fn default_region() -> String {
@@ -34,6 +41,14 @@ fn default_game_info_delay() -> u64 {
     200
 }
 
+fn default_sort_criteria() -> String {
+    "Price".to_string()
+}
+
+fn default_sort_direction() -> String {
+    "Ascending".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -43,6 +58,8 @@ impl Default for Config {
             deals_page_size: default_page_size(),
             game_info_delay_ms: default_game_info_delay(),
             api_key: None,
+            default_sort_criteria: default_sort_criteria(),
+            default_sort_direction: default_sort_direction(),
         }
     }
 }
@@ -108,13 +125,36 @@ impl Config {
     }
 
     /// Update from OptionsState
-    pub fn update_from_options(&mut self, default_platform: Platform, enabled_platforms: &HashSet<Platform>, region: Region) {
+    pub fn update_from_options(&mut self, default_platform: Platform, enabled_platforms: &HashSet<Platform>, region: Region, default_sort: SortState) {
         self.default_platform = default_platform.name().to_string();
         self.enabled_platforms = enabled_platforms
             .iter()
             .map(|p| p.name().to_string())
             .collect();
         self.region = region.code().to_string();
+        self.default_sort_criteria = default_sort.criteria.name().to_string();
+        self.default_sort_direction = match default_sort.direction {
+            SortDirection::Ascending => "Ascending".to_string(),
+            SortDirection::Descending => "Descending".to_string(),
+        };
+    }
+
+    /// Get the default sort state from config
+    pub fn get_default_sort(&self) -> SortState {
+        let criteria = match self.default_sort_criteria.as_str() {
+            "Price" => SortCriteria::Price,
+            "Cut" => SortCriteria::Cut,
+            "Hottest" => SortCriteria::Hottest,
+            "Release" => SortCriteria::ReleaseDate,
+            "Expiring" => SortCriteria::Expiring,
+            "Popular" => SortCriteria::Popular,
+            _ => SortCriteria::Price,
+        };
+        let direction = match self.default_sort_direction.as_str() {
+            "Descending" => SortDirection::Descending,
+            _ => SortDirection::Ascending,
+        };
+        SortState { criteria, direction }
     }
 
     /// Set the API key and save to config

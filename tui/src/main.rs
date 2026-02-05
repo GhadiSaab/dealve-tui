@@ -300,6 +300,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                             KeyCode::BackTab | KeyCode::Left => app.options_prev_tab(),
                             KeyCode::Down | KeyCode::Char('j') => app.options_next_item(),
                             KeyCode::Up | KeyCode::Char('k') => app.options_prev_item(),
+                            KeyCode::Char('s') => app.options_toggle_sort_direction(),
                             KeyCode::Enter | KeyCode::Char(' ') => {
                                 let needs_reload = app.options_toggle_item();
                                 if needs_reload {

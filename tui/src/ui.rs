@@ -819,15 +819,17 @@ fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
 
     // Description
     let desc = Paragraph::new(Line::from(Span::styled(
-        "Performance and pagination settings:",
+        "Default sort and performance settings:",
         Style::default().fg(TEXT_SECONDARY),
     )));
     frame.render_widget(desc, chunks[0]);
 
     // Settings list
+    let sort_value = format!("{} {}", app.options.default_sort.criteria.name(), app.options.default_sort.direction.arrow());
     let settings = [
-        ("Page Size", format!("{}", app.options.deals_page_size), "Deals loaded per batch"),
-        ("Info Delay", format!("{}ms", app.options.game_info_delay_ms), "Debounce for game info"),
+        ("Default Sort", sort_value, "Sort on startup"),
+        ("Page Size", format!("{}", app.options.deals_page_size), "Deals per batch"),
+        ("Info Delay", format!("{}ms", app.options.game_info_delay_ms), "Debounce delay"),
     ];
 
     let mut setting_lines: Vec<Line> = Vec::new();
@@ -835,26 +837,26 @@ fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
         let is_selected = app.options.advanced_list_index == i;
 
         let line_style = if is_selected {
-            Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+            Style::default().fg(TEXT_PRIMARY).bg(BG_HIGHLIGHT)
         } else {
             Style::default().fg(TEXT_PRIMARY)
         };
 
         let value_style = if is_selected {
-            Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT).add_modifier(Modifier::BOLD)
+            Style::default().fg(PURPLE_LIGHT).bg(BG_HIGHLIGHT).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)
         };
 
         let desc_style = if is_selected {
-            Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+            Style::default().fg(TEXT_SECONDARY).bg(BG_HIGHLIGHT)
         } else {
             Style::default().fg(TEXT_SECONDARY)
         };
 
         setting_lines.push(Line::from(vec![
             Span::styled(format!(" {}: ", name), line_style),
-            Span::styled(format!("{:<6}", value), value_style),
+            Span::styled(format!("{:<12}", value), value_style),
             Span::styled(format!(" ({})", desc), desc_style),
         ]));
     }
@@ -866,11 +868,12 @@ fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
             .title(Span::styled(" Settings ", Style::default().fg(PURPLE_LIGHT))));
     frame.render_widget(settings_list, chunks[1]);
 
-    // Help text
-    let help = Paragraph::new(Line::from(Span::styled(
-        "[Enter] Cycle value  [Tab] Switch tab  [Esc] Close",
-        Style::default().fg(TEXT_SECONDARY),
-    )));
+    // Help text (2 lines)
+    let help_lines = vec![
+        Line::from(Span::styled("[Enter] Cycle  [s] Direction  [Tab] Switch tab", Style::default().fg(TEXT_SECONDARY))),
+        Line::from(Span::styled("[Esc] Close", Style::default().fg(TEXT_SECONDARY))),
+    ];
+    let help = Paragraph::new(help_lines);
     frame.render_widget(help, chunks[2]);
 }
 
