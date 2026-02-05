@@ -287,13 +287,14 @@ fn build_status_line(app: &App, dimmed: bool) -> Line<'static> {
     // Separator
     spans.push(Span::styled("└┘", Style::default().fg(border_color)));
 
-    // Sort order
+    // Sort: format is "sort[←Price↑→]" with arrows for criteria navigation
     spans.push(Span::styled("s", Style::default().fg(shortcut_color)));
-    spans.push(Span::styled("ort", Style::default().fg(text_color)));
-    match app.sort_order.label() {
-        Some(label) => spans.push(Span::styled(format!("[{}]", label), Style::default().fg(value_color))),
-        None => spans.push(Span::styled("[—]", Style::default().fg(text_color))),
-    }
+    spans.push(Span::styled("ort[", Style::default().fg(text_color)));
+    spans.push(Span::styled("←", Style::default().fg(shortcut_color)));
+    spans.push(Span::styled(app.sort_state.criteria.name().to_string(), Style::default().fg(value_color)));
+    spans.push(Span::styled(app.sort_state.direction.arrow().to_string(), Style::default().fg(value_color)));
+    spans.push(Span::styled("→", Style::default().fg(shortcut_color)));
+    spans.push(Span::styled("]", Style::default().fg(text_color)));
 
     // Separator
     spans.push(Span::styled("└┘", Style::default().fg(border_color)));
@@ -831,7 +832,8 @@ fn render_keybinds_popup(frame: &mut Frame) {
         "  [f]                 Filter by name",
         "  [c]                 Clear filter",
         "  [p]                 Change platform",
-        "  [s]                 Cycle sort order",
+        "  [s]                 Toggle sort direction",
+        "  [Left/Right]        Change sort criteria",
         "  [r]                 Refresh deals",
         "  [Esc]               Menu / Close popup",
         "  [q]                 Quit (from menu)",

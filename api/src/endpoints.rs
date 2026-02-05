@@ -8,6 +8,7 @@ impl ItadClient {
         limit: usize,
         offset: usize,
         shop_id: Option<u32>,
+        sort: Option<&str>,
     ) -> Result<Vec<Deal>> {
         let api_key = self.api_key().ok_or_else(|| {
             DealveError::Config("API key is required".to_string())
@@ -24,6 +25,10 @@ impl ItadClient {
 
         if let Some(id) = shop_id {
             query_params.push(("shops", id.to_string()));
+        }
+
+        if let Some(s) = sort {
+            query_params.push(("sort", s.to_string()));
         }
 
         let response = self

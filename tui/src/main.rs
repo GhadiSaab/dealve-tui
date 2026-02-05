@@ -67,11 +67,11 @@ fn restore_terminal() -> Result<()> {
 }
 
 /// Spawn a background task to load deals (non-blocking)
-fn spawn_deals_load(api_key: Option<String>, platform_filter: Platform, region_code: String, offset: usize, page_size: usize) -> DealsLoadTask {
+fn spawn_deals_load(api_key: Option<String>, platform_filter: Platform, region_code: String, offset: usize, page_size: usize, sort: Option<String>) -> DealsLoadTask {
     tokio::spawn(async move {
         let client = dealve_api::ItadClient::new(api_key);
         let shop_id = platform_filter.shop_id();
-        client.get_deals(&region_code, page_size, offset, shop_id).await
+        client.get_deals(&region_code, page_size, offset, shop_id, sort.as_deref()).await
     })
 }
 
@@ -132,6 +132,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
         app.region.code().to_string(),
         0,
         app.deals_page_size,
+        app.sort_state.api_param(),
     ));
 
     // Task for loading more deals (pagination)
@@ -213,6 +214,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                 app.region.code().to_string(),
                 app.deals_offset,
                 app.deals_page_size,
+                app.sort_state.api_param(),
             ));
         }
 
@@ -253,6 +255,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                                         app.region.code().to_string(),
                                         0,
                                         app.deals_page_size,
+                                        app.sort_state.api_param(),
                                     ));
                                 }
                             }
@@ -278,6 +281,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                                             app.region.code().to_string(),
                                             0,
                                             app.deals_page_size,
+                                            app.sort_state.api_param(),
                                         ));
                                     }
                                 }
@@ -358,11 +362,58 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                                         app.region.code().to_string(),
                                         0,
                                         app.deals_page_size,
+                                        app.sort_state.api_param(),
                                     ));
                                 }
                             }
                             KeyCode::Char('s') => {
-                                app.cycle_sort_order();
+                                let needs_reload = app.toggle_sort_direction();
+                                if needs_reload && load_task.is_none() {
+                                    app.reset_pagination();
+                                    app.set_loading(true);
+                                    load_task = Some(spawn_deals_load(
+                                        app.api_key.clone(),
+                                        app.platform_filter,
+                                        app.region.code().to_string(),
+                                        0,
+                                        app.deals_page_size,
+                                        app.sort_state.api_param(),
+                                    ));
+                                }
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            KeyCode::Left => {
+                                let needs_reload = app.prev_sort_criteria();
+                                if needs_reload && load_task.is_none() {
+                                    app.reset_pagination();
+                                    app.set_loading(true);
+                                    load_task = Some(spawn_deals_load(
+                                        app.api_key.clone(),
+                                        app.platform_filter,
+                                        app.region.code().to_string(),
+                                        0,
+                                        app.deals_page_size,
+                                        app.sort_state.api_param(),
+                                    ));
+                                }
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            KeyCode::Right => {
+                                let needs_reload = app.next_sort_criteria();
+                                if needs_reload && load_task.is_none() {
+                                    app.reset_pagination();
+                                    app.set_loading(true);
+                                    load_task = Some(spawn_deals_load(
+                                        app.api_key.clone(),
+                                        app.platform_filter,
+                                        app.region.code().to_string(),
+                                        0,
+                                        app.deals_page_size,
+                                        app.sort_state.api_param(),
+                                    ));
+                                }
                                 last_selection_change = std::time::Instant::now();
                                 pending_game_info_load = true;
                             }
