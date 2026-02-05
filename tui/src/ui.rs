@@ -47,6 +47,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         Popup::Options => render_options_popup(frame, app),
         Popup::Keybinds => render_keybinds_popup(frame),
         Popup::Platform => render_platform_popup(frame, app),
+        Popup::PriceFilter => render_price_filter_popup(frame, app),
     }
 }
 
@@ -283,6 +284,15 @@ fn build_status_line(app: &App, dimmed: bool) -> Line<'static> {
     // Platform
     spans.push(Span::styled("p", Style::default().fg(shortcut_color)));
     spans.push(Span::styled("latform", Style::default().fg(text_color)));
+
+    // Separator
+    spans.push(Span::styled("└┘", Style::default().fg(border_color)));
+
+    // Price filter
+    spans.push(Span::styled("$", Style::default().fg(shortcut_color)));
+    if app.price_filter.is_active() {
+        spans.push(Span::styled(format!("[{}]", app.price_filter.label()), Style::default().fg(value_color)));
+    }
 
     // Separator
     spans.push(Span::styled("└┘", Style::default().fg(border_color)));
@@ -831,6 +841,7 @@ fn render_keybinds_popup(frame: &mut Frame) {
         "  [Enter]             Open deal / Select",
         "  [f]                 Filter by name",
         "  [c]                 Clear filter",
+        "  [$]                 Price filter",
         "  [p]                 Change platform",
         "  [s]                 Toggle sort direction",
         "  [Left/Right]        Change sort criteria",
@@ -923,6 +934,78 @@ fn render_platform_popup(frame: &mut Frame, app: &App) {
         Style::default().fg(TEXT_SECONDARY),
     )));
     frame.render_widget(help, chunks[1]);
+}
+
+fn render_price_filter_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_width = 32u16;
+    let popup_height = 10u16;
+    let popup_x = area.width.saturating_sub(popup_width) / 2;
+    let popup_y = area.height.saturating_sub(popup_height) / 2;
+    let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    frame.render_widget(Clear, popup_area);
+
+    // Main popup block
+    let block = Block::default()
+        .title(Span::styled(" Price Filter ", Style::default().fg(PURPLE_LIGHT)))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(PURPLE_ACCENT));
+    frame.render_widget(block, popup_area);
+
+    // Inner area
+    let inner = Rect::new(
+        popup_area.x + 2,
+        popup_area.y + 2,
+        popup_area.width - 4,
+        popup_area.height - 4,
+    );
+
+    // Build content with two input fields
+    let min_selected = app.price_filter.selected_field == 0;
+    let max_selected = app.price_filter.selected_field == 1;
+
+    let min_style = if min_selected {
+        Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+    } else {
+        Style::default().fg(TEXT_PRIMARY)
+    };
+
+    let max_style = if max_selected {
+        Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT)
+    } else {
+        Style::default().fg(TEXT_PRIMARY)
+    };
+
+    let min_cursor = if min_selected { "▋" } else { "" };
+    let max_cursor = if max_selected { "▋" } else { "" };
+
+    let min_display = format!("{}{}", app.price_filter.min_input, min_cursor);
+    let max_display = format!("{}{}", app.price_filter.max_input, max_cursor);
+
+    let content = vec![
+        Line::from(vec![
+            Span::styled("Min: ", Style::default().fg(PURPLE_LIGHT)),
+            Span::styled(format!("{:<10}", min_display), min_style),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Max: ", Style::default().fg(PURPLE_LIGHT)),
+            Span::styled(format!("{:<10}", max_display), max_style),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "[Tab] Switch  [Enter] Apply",
+            Style::default().fg(TEXT_SECONDARY),
+        )),
+        Line::from(Span::styled(
+            "[c] Clear  [Esc] Cancel",
+            Style::default().fg(TEXT_SECONDARY),
+        )),
+    ];
+
+    let paragraph = Paragraph::new(content);
+    frame.render_widget(paragraph, inner);
 }
 
 /// Calculate vertical padding to center text within an area

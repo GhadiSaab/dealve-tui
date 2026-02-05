@@ -292,6 +292,25 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                         if key.code == KeyCode::Esc {
                             app.close_popup();
                         }
+                    } else if app.popup == Popup::PriceFilter {
+                        match key.code {
+                            KeyCode::Esc => app.close_popup(),
+                            KeyCode::Tab => app.price_filter_switch_field(),
+                            KeyCode::Enter => {
+                                app.price_filter_apply();
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            KeyCode::Backspace => app.price_filter_pop(),
+                            KeyCode::Char('c') => {
+                                app.price_filter_clear();
+                                app.close_popup();
+                                last_selection_change = std::time::Instant::now();
+                                pending_game_info_load = true;
+                            }
+                            KeyCode::Char(c) => app.price_filter_push(c),
+                            _ => {}
+                        }
                     } else if app.show_menu {
                         match key.code {
                             KeyCode::Esc => {
@@ -418,12 +437,16 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
                                 pending_game_info_load = true;
                             }
                             KeyCode::Char('c') => {
-                                // Clear filter if one is active
-                                if !app.filter_text.is_empty() {
+                                // Clear filters if any are active
+                                if !app.filter_text.is_empty() || app.price_filter.is_active() {
                                     app.clear_filter();
+                                    app.price_filter_clear();
                                     last_selection_change = std::time::Instant::now();
                                     pending_game_info_load = true;
                                 }
+                            }
+                            KeyCode::Char('$') => {
+                                app.open_price_filter_popup();
                             }
                             _ => {}
                         }

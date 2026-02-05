@@ -37,6 +37,58 @@ pub enum Popup {
     Options,
     Keybinds,
     Platform,
+    PriceFilter,
+}
+
+/// Price filter state for the popup
+#[derive(Debug, Clone, Default)]
+pub struct PriceFilterState {
+    pub min_input: String,
+    pub max_input: String,
+    pub selected_field: usize, // 0 = min, 1 = max
+    pub active_min: Option<f64>,
+    pub active_max: Option<f64>,
+}
+
+impl PriceFilterState {
+    pub fn clear(&mut self) {
+        self.min_input.clear();
+        self.max_input.clear();
+        self.active_min = None;
+        self.active_max = None;
+    }
+
+    pub fn apply(&mut self) {
+        self.active_min = self.min_input.parse().ok();
+        self.active_max = self.max_input.parse().ok();
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.active_min.is_some() || self.active_max.is_some()
+    }
+
+    pub fn label(&self) -> String {
+        match (self.active_min, self.active_max) {
+            (Some(min), Some(max)) => format!("{:.0}-{:.0}", min, max),
+            (Some(min), None) => format!(">{:.0}", min),
+            (None, Some(max)) => format!("<{:.0}", max),
+            (None, None) => "—".to_string(),
+        }
+    }
+
+    pub fn matches(&self, price: f64) -> bool {
+        if let Some(min) = self.active_min {
+            if price < min {
+                return false;
+            }
+        }
+        if let Some(max) = self.active_max {
+            if price > max {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 /// Sort criteria for deals
@@ -258,6 +310,8 @@ pub struct App {
     // Filter state
     pub filter_active: bool,
     pub filter_text: String,
+    // Price filter state
+    pub price_filter: PriceFilterState,
     // API client
     pub api_key: Option<String>,
     client: ItadClient,
@@ -302,6 +356,7 @@ impl App {
             game_info_delay_ms: config.game_info_delay_ms,
             filter_active: false,
             filter_text: String::new(),
+            price_filter: PriceFilterState::default(),
             api_key: api_key.clone(),
             client: ItadClient::new(api_key),
         }
@@ -374,6 +429,11 @@ impl App {
         if !self.filter_active && !self.filter_text.is_empty() {
             let filter_lower = self.filter_text.to_lowercase();
             deals.retain(|deal| deal.title.to_lowercase().contains(&filter_lower));
+        }
+
+        // Apply price filter
+        if self.price_filter.is_active() {
+            deals.retain(|deal| self.price_filter.matches(deal.price.amount));
         }
 
         // Client-side sorting only for Release (Price/Cut come pre-sorted from API)
@@ -456,6 +516,62 @@ impl App {
     pub fn clear_filter(&mut self) {
         self.filter_text.clear();
         self.filter_active = false;
+        self.select(Some(0));
+    }
+
+    /// Open price filter popup
+    pub fn open_price_filter_popup(&mut self) {
+        // Initialize inputs from active filter if any
+        self.price_filter.min_input = self.price_filter.active_min
+            .map(|v| format!("{:.0}", v))
+            .unwrap_or_default();
+        self.price_filter.max_input = self.price_filter.active_max
+            .map(|v| format!("{:.0}", v))
+            .unwrap_or_default();
+        self.price_filter.selected_field = 0;
+        self.popup = Popup::PriceFilter;
+    }
+
+    /// Switch between min/max fields in price filter popup
+    pub fn price_filter_switch_field(&mut self) {
+        self.price_filter.selected_field = 1 - self.price_filter.selected_field;
+    }
+
+    /// Add character to current price filter field
+    pub fn price_filter_push(&mut self, c: char) {
+        if c.is_ascii_digit() || c == '.' {
+            let input = if self.price_filter.selected_field == 0 {
+                &mut self.price_filter.min_input
+            } else {
+                &mut self.price_filter.max_input
+            };
+            // Limit to reasonable length
+            if input.len() < 8 {
+                input.push(c);
+            }
+        }
+    }
+
+    /// Remove character from current price filter field
+    pub fn price_filter_pop(&mut self) {
+        let input = if self.price_filter.selected_field == 0 {
+            &mut self.price_filter.min_input
+        } else {
+            &mut self.price_filter.max_input
+        };
+        input.pop();
+    }
+
+    /// Apply price filter and close popup
+    pub fn price_filter_apply(&mut self) {
+        self.price_filter.apply();
+        self.popup = Popup::None;
+        self.select(Some(0));
+    }
+
+    /// Clear price filter
+    pub fn price_filter_clear(&mut self) {
+        self.price_filter.clear();
         self.select(Some(0));
     }
 
