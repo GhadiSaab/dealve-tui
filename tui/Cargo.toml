@@ -3,14 +3,19 @@ name = "dealve-tui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Delve into game deals from your terminal 👾"
 
 [[bin]]
 name = "dealve"
 path = "src/main.rs"
 
 [dependencies]
-dealve-core = { path = "../core" }
-dealve-api = { path = "../api" }
+dealve-core = { path = "../core", version = "1.0.0" }
+dealve-api = { path = "../api", version = "1.0.0" }
 tokio = { version = "1.42", features = ["full"] }
 ratatui = "0.30"
 crossterm = "0.28"
