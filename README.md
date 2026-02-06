@@ -1,11 +1,17 @@
-# Dealve
+<div align="center">
 
-The fastest way to browse game deals from your terminal.
+  <img src=".github/assets/logo.png" alt="Dealve" />
 
-<!-- ![Demo](examples/demo.gif)
+ Delve into game deals from your terminal 👾
 
-[![crates.io](https://img.shields.io/crates/v/dealve-tui.svg)](https://crates.io/crates/dealve-tui) -->
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
+![Demo](.github/assets/demo.gif)
+
+[![crates.io](https://img.shields.io/crates/v/dealve-tui.svg?color=B482FF)](https://crates.io/crates/dealve-tui)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg?color=B482FF)](LICENSE)
+
+</div>
+
+## Description
 
 **Dealve** simplifies finding the best game deals across Steam, GOG, Humble Bundle, Epic Games, and more - all from your terminal. Powered by [IsThereAnyDeal](https://isthereanydeal.com).
 
