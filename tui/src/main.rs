@@ -10,11 +10,14 @@ use crossterm::{
     ExecutableCommand,
 };
 use dealve_core::models::{Deal, Platform, PriceHistoryPoint};
-use ratatui::{backend::CrosstermBackend, prelude::Color, layout::Rect, Terminal};
-use std::{io::{stdout, Stdout}, time::Instant};
-use tachyonfx::{fx, Effect, EffectTimer, Interpolation, Motion};
+use ratatui::{backend::CrosstermBackend, layout::Rect, prelude::Color, Terminal};
+use std::{
+    io::{stdout, Stdout},
+    time::Instant,
+};
 use tachyonfx::fx::EvolveSymbolSet;
 use tachyonfx::pattern::RadialPattern;
+use tachyonfx::{fx, Effect, EffectTimer, Interpolation, Motion};
 use tokio::task::JoinHandle;
 
 use app::{App, Popup};
@@ -68,17 +71,30 @@ fn restore_terminal() -> Result<()> {
 }
 
 /// Spawn a background task to load deals (non-blocking)
-fn spawn_deals_load(api_key: Option<String>, platform_filter: Platform, region_code: String, offset: usize, page_size: usize, sort: String) -> DealsLoadTask {
+fn spawn_deals_load(
+    api_key: Option<String>,
+    platform_filter: Platform,
+    region_code: String,
+    offset: usize,
+    page_size: usize,
+    sort: String,
+) -> DealsLoadTask {
     tokio::spawn(async move {
         let client = dealve_api::ItadClient::new(api_key);
         let shop_id = platform_filter.shop_id();
-        client.get_deals(&region_code, page_size, offset, shop_id, Some(&sort)).await
+        client
+            .get_deals(&region_code, page_size, offset, shop_id, Some(&sort))
+            .await
     })
 }
 
 /// Check if load task is finished and handle result
 /// Returns true if task completed (for initial load)
-async fn check_load_task(app: &mut App, load_task: &mut Option<DealsLoadTask>, is_loading_more: bool) -> bool {
+async fn check_load_task(
+    app: &mut App,
+    load_task: &mut Option<DealsLoadTask>,
+    is_loading_more: bool,
+) -> bool {
     if let Some(task) = load_task.as_mut() {
         if task.is_finished() {
             // Task finished, get result
@@ -122,7 +138,10 @@ async fn check_load_task(app: &mut App, load_task: &mut Option<DealsLoadTask>, i
     false
 }
 
-async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<String>) -> Result<()> {
+async fn run(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    api_key: Option<String>,
+) -> Result<()> {
     let mut app = App::new(api_key);
 
     // Start initial load (non-blocking)
@@ -155,8 +174,8 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
     let full_screen = Rect::new(0, 0, term_size.width, term_size.height);
 
     let style = ratatui::style::Style::default()
-        .fg(Color::Rgb(20, 15, 30))   // BG_DARK
-        .bg(Color::Rgb(10, 8, 15));   // darker bg
+        .fg(Color::Rgb(20, 15, 30)) // BG_DARK
+        .bg(Color::Rgb(10, 8, 15)); // darker bg
 
     let timer = EffectTimer::from_ms(1200, Interpolation::CubicOut);
 
@@ -194,14 +213,19 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
             // Trigger sweep-in effect for deals list inner area (excluding status bar)
             let term_size = terminal.size()?;
             // Exclude top border (1), bottom border (1), and status line area
-            let deals_inner = Rect::new(1, 1, term_size.width / 2 - 2, term_size.height.saturating_sub(2));
+            let deals_inner = Rect::new(
+                1,
+                1,
+                term_size.width / 2 - 2,
+                term_size.height.saturating_sub(2),
+            );
             effects.push((
                 fx::sweep_in(
                     Motion::UpToDown,
-                    15,  // gradient length for smoother wave
-                    3,   // randomness for wave-like effect
-                    Color::Rgb(20, 15, 30),  // BG_DARK color
-                    (600, Interpolation::QuadOut),  // 600ms with ease-out
+                    15,                            // gradient length for smoother wave
+                    3,                             // randomness for wave-like effect
+                    Color::Rgb(20, 15, 30),        // BG_DARK color
+                    (600, Interpolation::QuadOut), // 600ms with ease-out
                 ),
                 deals_inner,
             ));
@@ -230,7 +254,12 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<Stdout>>, api_key: Option<
 
         // Check if we should load game info (after debounce delay)
         // Don't load during animations to avoid blocking the render loop
-        if pending_game_info_load && !app.loading && effects.is_empty() && last_selection_change.elapsed() >= std::time::Duration::from_millis(app.game_info_delay_ms) {
+        if pending_game_info_load
+            && !app.loading
+            && effects.is_empty()
+            && last_selection_change.elapsed()
+                >= std::time::Duration::from_millis(app.game_info_delay_ms)
+        {
             pending_game_info_load = false;
             app.load_game_info_for_selected().await;
         }

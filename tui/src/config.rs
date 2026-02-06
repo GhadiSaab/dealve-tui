@@ -125,7 +125,13 @@ impl Config {
     }
 
     /// Update from OptionsState
-    pub fn update_from_options(&mut self, default_platform: Platform, enabled_platforms: &HashSet<Platform>, region: Region, default_sort: SortState) {
+    pub fn update_from_options(
+        &mut self,
+        default_platform: Platform,
+        enabled_platforms: &HashSet<Platform>,
+        region: Region,
+        default_sort: SortState,
+    ) {
         self.default_platform = default_platform.name().to_string();
         self.enabled_platforms = enabled_platforms
             .iter()
@@ -154,7 +160,10 @@ impl Config {
             "Descending" => SortDirection::Descending,
             _ => SortDirection::Ascending,
         };
-        SortState { criteria, direction }
+        SortState {
+            criteria,
+            direction,
+        }
     }
 
     /// Set the API key and save to config

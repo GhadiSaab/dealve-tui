@@ -1,8 +1,11 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect, Alignment},
-    style::{Color, Style, Modifier},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, Row, Cell, Sparkline},
+    widgets::{
+        Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Sparkline, Table,
+    },
     Frame,
 };
 
@@ -10,17 +13,17 @@ use crate::app::{App, MenuItem, OptionsTab, Popup};
 use dealve_core::models::{Platform, Region};
 
 // Dealve color palette - Pastel theme (light colors for dark background)
-const PURPLE_PRIMARY: Color = Color::Rgb(200, 160, 255);   // Pastel lavender - main brand color
-const PURPLE_LIGHT: Color = Color::Rgb(220, 190, 255);     // Lighter pastel lavender - highlights
-const PURPLE_ACCENT: Color = Color::Rgb(180, 130, 255);    // Slightly stronger pastel for accents
-const SHORTCUT_KEY: Color = Color::Rgb(255, 120, 200);     // Pink/magenta for shortcut keys (btop style)
-const ACCENT_GREEN: Color = Color::Rgb(150, 230, 150);     // Pastel mint green - good deals
-const ACCENT_YELLOW: Color = Color::Rgb(255, 230, 150);    // Pastel gold/cream - medium deals
+const PURPLE_PRIMARY: Color = Color::Rgb(200, 160, 255); // Pastel lavender - main brand color
+const PURPLE_LIGHT: Color = Color::Rgb(220, 190, 255); // Lighter pastel lavender - highlights
+const PURPLE_ACCENT: Color = Color::Rgb(180, 130, 255); // Slightly stronger pastel for accents
+const SHORTCUT_KEY: Color = Color::Rgb(255, 120, 200); // Pink/magenta for shortcut keys (btop style)
+const ACCENT_GREEN: Color = Color::Rgb(150, 230, 150); // Pastel mint green - good deals
+const ACCENT_YELLOW: Color = Color::Rgb(255, 230, 150); // Pastel gold/cream - medium deals
 const TEXT_PRIMARY: Color = Color::White;
-const TEXT_SECONDARY: Color = Color::Rgb(180, 180, 180);   // Light gray
-const TEXT_DIMMED: Color = Color::Rgb(90, 90, 90);         // Dimmed text for background when menu open
-const BG_DARK: Color = Color::Rgb(20, 15, 30);             // Very dark purple background
-const BG_HIGHLIGHT: Color = Color::Rgb(60, 45, 90);        // Darker purple for selection highlight
+const TEXT_SECONDARY: Color = Color::Rgb(180, 180, 180); // Light gray
+const TEXT_DIMMED: Color = Color::Rgb(90, 90, 90); // Dimmed text for background when menu open
+const BG_DARK: Color = Color::Rgb(20, 15, 30); // Very dark purple background
+const BG_HIGHLIGHT: Color = Color::Rgb(60, 45, 90); // Darker purple for selection highlight
 
 const ASCII_LOGO: [&str; 6] = [
     "██████╗ ███████╗ █████╗ ██╗    ██╗   ██╗███████╗",
@@ -96,11 +99,13 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
         let loading = Paragraph::new(format!("{}{} Loading deals...", padding, spinner))
             .alignment(Alignment::Center)
             .style(Style::default().fg(text_color))
-            .block(Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-                .title(title)
-                .title_bottom(status_line));
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(border_color))
+                    .title(title)
+                    .title_bottom(status_line),
+            );
         frame.render_widget(loading, area);
         return;
     }
@@ -109,11 +114,13 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
         let error_title = build_title("Error", border_color, title_color);
         let error_msg = Paragraph::new(format!("Error: {}", error))
             .style(Style::default().fg(Color::Red))
-            .block(Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-                .title(error_title)
-                .title_bottom(status_line));
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(border_color))
+                    .title(error_title)
+                    .title_bottom(status_line),
+            );
         frame.render_widget(error_msg, area);
         return;
     }
@@ -125,11 +132,13 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
         let empty = Paragraph::new(format!("{}No deals found", padding))
             .alignment(Alignment::Center)
             .style(Style::default().fg(text_color))
-            .block(Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-                .title(title)
-                .title_bottom(status_line));
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(border_color))
+                    .title(title)
+                    .title_bottom(status_line),
+            );
         frame.render_widget(empty, area);
         return;
     }
@@ -151,7 +160,8 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
             let discount_str = format!("-{}%", deal.price.discount);
 
             // Check if this is an all-time low - highlight in purple!
-            let is_atl = deal.history_low
+            let is_atl = deal
+                .history_low
                 .map(|low| (low - deal.price.amount).abs() < 0.01)
                 .unwrap_or(false);
 
@@ -203,7 +213,12 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
     } else {
         format!(" {}/{} ", selected + 1, total_items)
     };
-    let counter = Span::styled(counter_text, Style::default().fg(counter_color).add_modifier(Modifier::BOLD));
+    let counter = Span::styled(
+        counter_text,
+        Style::default()
+            .fg(counter_color)
+            .add_modifier(Modifier::BOLD),
+    );
 
     // Column widths: Title takes remaining space, Price 8, Deal 6, ATL 4
     let widths = [
@@ -215,12 +230,14 @@ fn render_deals_list(frame: &mut Frame, app: &mut App, area: Rect, dimmed: bool)
 
     let table = Table::new(rows, widths)
         .header(header)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(border_color))
-            .title(title)
-            .title_bottom(status_line)
-            .title_bottom(Line::from(counter).alignment(Alignment::Right)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color))
+                .title(title)
+                .title_bottom(status_line)
+                .title_bottom(Line::from(counter).alignment(Alignment::Right)),
+        )
         .row_highlight_style(highlight_style)
         .highlight_symbol("> ");
 
@@ -266,12 +283,18 @@ fn build_status_line(app: &App, dimmed: bool) -> Line<'static> {
     // Filter: show input field when active, otherwise show "filter" shortcut
     if app.filter_active {
         spans.push(Span::styled("f ", Style::default().fg(shortcut_color)));
-        spans.push(Span::styled(app.filter_text.clone(), Style::default().fg(text_color)));
+        spans.push(Span::styled(
+            app.filter_text.clone(),
+            Style::default().fg(text_color),
+        ));
         spans.push(Span::styled("_", Style::default().fg(text_color)));
         spans.push(Span::styled(" ⏎", Style::default().fg(shortcut_color)));
     } else if !app.filter_text.is_empty() {
         spans.push(Span::styled("f", Style::default().fg(shortcut_color)));
-        spans.push(Span::styled(format!("[{}] ", app.filter_text.clone()), Style::default().fg(value_color)));
+        spans.push(Span::styled(
+            format!("[{}] ", app.filter_text.clone()),
+            Style::default().fg(value_color),
+        ));
         spans.push(Span::styled("c", Style::default().fg(shortcut_color)));
         spans.push(Span::styled("lear", Style::default().fg(text_color)));
     } else {
@@ -292,7 +315,10 @@ fn build_status_line(app: &App, dimmed: bool) -> Line<'static> {
     // Price filter
     spans.push(Span::styled("$", Style::default().fg(shortcut_color)));
     if app.price_filter.is_active() {
-        spans.push(Span::styled(format!("[{}]", app.price_filter.label()), Style::default().fg(value_color)));
+        spans.push(Span::styled(
+            format!("[{}]", app.price_filter.label()),
+            Style::default().fg(value_color),
+        ));
     }
 
     // Separator
@@ -302,8 +328,14 @@ fn build_status_line(app: &App, dimmed: bool) -> Line<'static> {
     spans.push(Span::styled("s", Style::default().fg(shortcut_color)));
     spans.push(Span::styled("ort[", Style::default().fg(text_color)));
     spans.push(Span::styled("←", Style::default().fg(shortcut_color)));
-    spans.push(Span::styled(app.sort_state.criteria.name().to_string(), Style::default().fg(value_color)));
-    spans.push(Span::styled(app.sort_state.direction.arrow().to_string(), Style::default().fg(value_color)));
+    spans.push(Span::styled(
+        app.sort_state.criteria.name().to_string(),
+        Style::default().fg(value_color),
+    ));
+    spans.push(Span::styled(
+        app.sort_state.direction.arrow().to_string(),
+        Style::default().fg(value_color),
+    ));
     spans.push(Span::styled("→", Style::default().fg(shortcut_color)));
     spans.push(Span::styled("]", Style::default().fg(text_color)));
 
@@ -313,7 +345,6 @@ fn build_status_line(app: &App, dimmed: bool) -> Line<'static> {
     // Refresh
     spans.push(Span::styled("r", Style::default().fg(shortcut_color)));
     spans.push(Span::styled("efresh", Style::default().fg(text_color)));
-
 
     // Last element closing bracket
     spans.push(Span::styled("└", Style::default().fg(border_color)));
@@ -366,22 +397,27 @@ fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
     let mut lines: Vec<Line> = Vec::new();
 
     // Check if ATL
-    let is_atl = deal.history_low
+    let is_atl = deal
+        .history_low
         .map(|low| (low - deal.price.amount).abs() < 0.01)
         .unwrap_or(false);
 
     // Title with ATL badge if applicable
     if is_atl {
-        lines.push(Line::from(vec![
-            Span::styled(">> ALL-TIME LOW <<", Style::default().fg(purple_color).add_modifier(Modifier::BOLD)),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            ">> ALL-TIME LOW <<",
+            Style::default()
+                .fg(purple_color)
+                .add_modifier(Modifier::BOLD),
+        )]));
         lines.push(Line::from("")); // Spacer
     }
 
     // Title
-    lines.push(Line::from(vec![
-        Span::styled(&deal.title, Style::default().fg(text_color).add_modifier(Modifier::BOLD)),
-    ]));
+    lines.push(Line::from(vec![Span::styled(
+        &deal.title,
+        Style::default().fg(text_color).add_modifier(Modifier::BOLD),
+    )]));
 
     // Release date and developers from game info
     if let Some(info) = game_info {
@@ -394,19 +430,26 @@ fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
         if !info.developers.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("Developer: ", Style::default().fg(label_color)),
-                Span::styled(info.developers.join(", "), Style::default().fg(secondary_color)),
+                Span::styled(
+                    info.developers.join(", "),
+                    Style::default().fg(secondary_color),
+                ),
             ]));
         }
         if !info.publishers.is_empty() && info.publishers != info.developers {
             lines.push(Line::from(vec![
                 Span::styled("Publisher: ", Style::default().fg(label_color)),
-                Span::styled(info.publishers.join(", "), Style::default().fg(secondary_color)),
+                Span::styled(
+                    info.publishers.join(", "),
+                    Style::default().fg(secondary_color),
+                ),
             ]));
         }
     } else if is_loading {
-        lines.push(Line::from(vec![
-            Span::styled("Loading game info...", Style::default().fg(secondary_color)),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            "Loading game info...",
+            Style::default().fg(secondary_color),
+        )]));
     }
 
     lines.push(Line::from("")); // Spacer
@@ -424,10 +467,23 @@ fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
     let price_color = if is_atl { purple_color } else { green_color };
 
     lines.push(Line::from(vec![
-        Span::styled(regular_str, Style::default().fg(secondary_color).add_modifier(Modifier::CROSSED_OUT)),
+        Span::styled(
+            regular_str,
+            Style::default()
+                .fg(secondary_color)
+                .add_modifier(Modifier::CROSSED_OUT),
+        ),
         Span::styled(" -> ", Style::default().fg(secondary_color)),
-        Span::styled(price_str, Style::default().fg(price_color).add_modifier(Modifier::BOLD)),
-        Span::styled(format!(" ({})", discount_str), Style::default().fg(yellow_color)),
+        Span::styled(
+            price_str,
+            Style::default()
+                .fg(price_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(" ({})", discount_str),
+            Style::default().fg(yellow_color),
+        ),
     ]));
 
     // Savings
@@ -436,7 +492,12 @@ fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
         let savings_str = format!("{}{:.2}", deal.price.currency_symbol(), savings);
         lines.push(Line::from(vec![
             Span::styled("You save ", Style::default().fg(secondary_color)),
-            Span::styled(savings_str, Style::default().fg(green_color).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                savings_str,
+                Style::default()
+                    .fg(green_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]));
     }
 
@@ -459,10 +520,17 @@ fn render_game_details(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
     if let Some(info) = game_info {
         if !info.tags.is_empty() {
             lines.push(Line::from("")); // Spacer
-            let tags_str = info.tags.iter().take(5).cloned().collect::<Vec<_>>().join(" | ");
-            lines.push(Line::from(vec![
-                Span::styled(tags_str, Style::default().fg(secondary_color)),
-            ]));
+            let tags_str = info
+                .tags
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" | ");
+            lines.push(Line::from(vec![Span::styled(
+                tags_str,
+                Style::default().fg(secondary_color),
+            )]));
         }
     }
 
@@ -494,10 +562,14 @@ fn render_price_chart(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
         let data: Vec<u64> = points.iter().map(|p| (p.price * 100.0) as u64).collect();
 
         let min_price = points.iter().map(|p| p.price).fold(f64::INFINITY, f64::min);
-        let max_price = points.iter().map(|p| p.price).fold(f64::NEG_INFINITY, f64::max);
+        let max_price = points
+            .iter()
+            .map(|p| p.price)
+            .fold(f64::NEG_INFINITY, f64::max);
         let current_price = points.last().map(|p| p.price).unwrap_or(0.0);
 
-        let currency = app.selected_deal()
+        let currency = app
+            .selected_deal()
             .map(|d| d.price.currency_symbol())
             .unwrap_or("€");
 
@@ -513,11 +585,20 @@ fn render_price_chart(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
 
         // Summary line
         let summary = Line::from(vec![
-            Span::styled(format!("Low: {}{:.2}", currency, min_price), Style::default().fg(ACCENT_GREEN)),
+            Span::styled(
+                format!("Low: {}{:.2}", currency, min_price),
+                Style::default().fg(ACCENT_GREEN),
+            ),
             Span::styled("  ", Style::default()),
-            Span::styled(format!("High: {}{:.2}", currency, max_price), Style::default().fg(ACCENT_YELLOW)),
+            Span::styled(
+                format!("High: {}{:.2}", currency, max_price),
+                Style::default().fg(ACCENT_YELLOW),
+            ),
             Span::styled("  ", Style::default()),
-            Span::styled(format!("Now: {}{:.2}", currency, current_price), Style::default().fg(TEXT_PRIMARY)),
+            Span::styled(
+                format!("Now: {}{:.2}", currency, current_price),
+                Style::default().fg(TEXT_PRIMARY),
+            ),
         ]);
         frame.render_widget(Paragraph::new(summary), chunks[0]);
 
@@ -528,13 +609,31 @@ fn render_price_chart(frame: &mut Frame, app: &App, area: Rect, dimmed: bool) {
         frame.render_widget(sparkline, chunks[1]);
     } else if app.loading_price_history.is_some() {
         let spinner = app.spinner_char();
-        render_price_chart_empty(frame, area, block, text_color, &format!("{} Loading price history...", spinner));
+        render_price_chart_empty(
+            frame,
+            area,
+            block,
+            text_color,
+            &format!("{} Loading price history...", spinner),
+        );
     } else {
-        render_price_chart_empty(frame, area, block, text_color, "Select a deal to view price history");
+        render_price_chart_empty(
+            frame,
+            area,
+            block,
+            text_color,
+            "Select a deal to view price history",
+        );
     }
 }
 
-fn render_price_chart_empty(frame: &mut Frame, area: Rect, block: Block, text_color: Color, message: &str) {
+fn render_price_chart_empty(
+    frame: &mut Frame,
+    area: Rect,
+    block: Block,
+    text_color: Color,
+    message: &str,
+) {
     let content_lines = vec![message];
     let padding = vertical_padding(area.height, content_lines.len() as u16);
     let content = format!("{}{}", padding, content_lines.join("\n"));
@@ -568,8 +667,7 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
         .iter()
         .map(|line| Line::from(Span::styled(*line, Style::default().fg(PURPLE_PRIMARY))))
         .collect();
-    let logo = Paragraph::new(logo_lines)
-        .alignment(Alignment::Center);
+    let logo = Paragraph::new(logo_lines).alignment(Alignment::Center);
     frame.render_widget(logo, logo_area);
 
     let menu_x = area.width.saturating_sub(menu_width) / 2;
@@ -583,7 +681,10 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
         .enumerate()
         .map(|(i, item)| {
             let style = if i == app.menu_selected {
-                Style::default().bg(BG_HIGHLIGHT).fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .bg(BG_HIGHLIGHT)
+                    .fg(PURPLE_LIGHT)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(TEXT_SECONDARY)
             };
@@ -592,10 +693,11 @@ fn render_menu_overlay(frame: &mut Frame, app: &App) {
         })
         .collect();
 
-    let menu = List::new(items)
-        .block(Block::default()
+    let menu = List::new(items).block(
+        Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(PURPLE_LIGHT)));
+            .border_style(Style::default().fg(PURPLE_LIGHT)),
+    );
 
     frame.render_widget(menu, menu_area);
 }
@@ -639,7 +741,10 @@ fn render_options_popup(frame: &mut Frame, app: &App) {
             if i == app.options.current_tab {
                 Span::styled(
                     format!(" {} ", tab.name()),
-                    Style::default().fg(TEXT_PRIMARY).bg(PURPLE_ACCENT).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(TEXT_PRIMARY)
+                        .bg(PURPLE_ACCENT)
+                        .add_modifier(Modifier::BOLD),
                 )
             } else {
                 Span::styled(
@@ -668,9 +773,9 @@ fn render_region_tab(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Description
-            Constraint::Min(5),     // Region list
-            Constraint::Length(2),  // Help text
+            Constraint::Length(3), // Description
+            Constraint::Min(5),    // Region list
+            Constraint::Length(2), // Help text
         ])
         .split(area);
 
@@ -702,11 +807,12 @@ fn render_region_tab(frame: &mut Frame, app: &App, area: Rect) {
         )));
     }
 
-    let region_list = Paragraph::new(region_lines)
-        .block(Block::default()
+    let region_list = Paragraph::new(region_lines).block(
+        Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(PURPLE_ACCENT))
-            .title(Span::styled(" Region ", Style::default().fg(PURPLE_LIGHT))));
+            .title(Span::styled(" Region ", Style::default().fg(PURPLE_LIGHT))),
+    );
     frame.render_widget(region_list, chunks[1]);
 
     // Help text
@@ -722,9 +828,9 @@ fn render_platforms_tab(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2),  // Default platform selector
-            Constraint::Min(5),     // Platforms list with border
-            Constraint::Length(2),  // Help text
+            Constraint::Length(2), // Default platform selector
+            Constraint::Min(5),    // Platforms list with border
+            Constraint::Length(2), // Help text
         ])
         .split(area);
 
@@ -791,10 +897,15 @@ fn render_platforms_tab(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let platforms_list = Paragraph::new(platform_lines)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(PURPLE_ACCENT))
-            .title(Span::styled(" Enabled Platforms ", Style::default().fg(PURPLE_LIGHT))))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(PURPLE_ACCENT))
+                .title(Span::styled(
+                    " Enabled Platforms ",
+                    Style::default().fg(PURPLE_LIGHT),
+                )),
+        )
         .scroll((scroll_offset, 0));
     frame.render_widget(platforms_list, chunks[1]);
 
@@ -811,9 +922,9 @@ fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Description
-            Constraint::Min(5),     // Settings list
-            Constraint::Length(2),  // Help text
+            Constraint::Length(3), // Description
+            Constraint::Min(5),    // Settings list
+            Constraint::Length(2), // Help text
         ])
         .split(area);
 
@@ -825,11 +936,23 @@ fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(desc, chunks[0]);
 
     // Settings list
-    let sort_value = format!("{} {}", app.options.default_sort.criteria.name(), app.options.default_sort.direction.arrow());
+    let sort_value = format!(
+        "{} {}",
+        app.options.default_sort.criteria.name(),
+        app.options.default_sort.direction.arrow()
+    );
     let settings = [
         ("Default Sort", sort_value, "Sort on startup"),
-        ("Page Size", format!("{}", app.options.deals_page_size), "Deals per batch"),
-        ("Info Delay", format!("{}ms", app.options.game_info_delay_ms), "Debounce delay"),
+        (
+            "Page Size",
+            format!("{}", app.options.deals_page_size),
+            "Deals per batch",
+        ),
+        (
+            "Info Delay",
+            format!("{}ms", app.options.game_info_delay_ms),
+            "Debounce delay",
+        ),
     ];
 
     let mut setting_lines: Vec<Line> = Vec::new();
@@ -843,9 +966,14 @@ fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
         };
 
         let value_style = if is_selected {
-            Style::default().fg(PURPLE_LIGHT).bg(BG_HIGHLIGHT).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(PURPLE_LIGHT)
+                .bg(BG_HIGHLIGHT)
+                .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(PURPLE_LIGHT)
+                .add_modifier(Modifier::BOLD)
         };
 
         let desc_style = if is_selected {
@@ -861,17 +989,27 @@ fn render_advanced_tab(frame: &mut Frame, app: &App, area: Rect) {
         ]));
     }
 
-    let settings_list = Paragraph::new(setting_lines)
-        .block(Block::default()
+    let settings_list = Paragraph::new(setting_lines).block(
+        Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(PURPLE_ACCENT))
-            .title(Span::styled(" Settings ", Style::default().fg(PURPLE_LIGHT))));
+            .title(Span::styled(
+                " Settings ",
+                Style::default().fg(PURPLE_LIGHT),
+            )),
+    );
     frame.render_widget(settings_list, chunks[1]);
 
     // Help text (2 lines)
     let help_lines = vec![
-        Line::from(Span::styled("[Enter] Cycle  [s] Direction  [Tab] Switch tab", Style::default().fg(TEXT_SECONDARY))),
-        Line::from(Span::styled("[Esc] Close", Style::default().fg(TEXT_SECONDARY))),
+        Line::from(Span::styled(
+            "[Enter] Cycle  [s] Direction  [Tab] Switch tab",
+            Style::default().fg(TEXT_SECONDARY),
+        )),
+        Line::from(Span::styled(
+            "[Esc] Close",
+            Style::default().fg(TEXT_SECONDARY),
+        )),
     ];
     let help = Paragraph::new(help_lines);
     frame.render_widget(help, chunks[2]);
@@ -906,10 +1044,15 @@ fn render_keybinds_popup(frame: &mut Frame) {
 
     let popup = Paragraph::new(content.join("\n"))
         .style(Style::default().fg(TEXT_PRIMARY))
-        .block(Block::default()
-            .title(Span::styled(" Keybinds ", Style::default().fg(PURPLE_LIGHT)))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(PURPLE_PRIMARY)));
+        .block(
+            Block::default()
+                .title(Span::styled(
+                    " Keybinds ",
+                    Style::default().fg(PURPLE_LIGHT),
+                ))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(PURPLE_PRIMARY)),
+        );
 
     frame.render_widget(popup, popup_area);
 }
@@ -929,7 +1072,10 @@ fn render_platform_popup(frame: &mut Frame, app: &App) {
 
     // Main popup block
     let block = Block::default()
-        .title(Span::styled(" Select Platform ", Style::default().fg(PURPLE_LIGHT)))
+        .title(Span::styled(
+            " Select Platform ",
+            Style::default().fg(PURPLE_LIGHT),
+        ))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(PURPLE_ACCENT));
     frame.render_widget(block, popup_area);
@@ -1000,7 +1146,10 @@ fn render_price_filter_popup(frame: &mut Frame, app: &App) {
 
     // Main popup block
     let block = Block::default()
-        .title(Span::styled(" Price Filter ", Style::default().fg(PURPLE_LIGHT)))
+        .title(Span::styled(
+            " Price Filter ",
+            Style::default().fg(PURPLE_LIGHT),
+        ))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(PURPLE_ACCENT));
     frame.render_widget(block, popup_area);

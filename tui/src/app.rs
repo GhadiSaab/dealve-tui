@@ -147,7 +147,11 @@ impl SortCriteria {
             SortCriteria::Expiring => "expiry",
             SortCriteria::Popular => "rank",
         };
-        if ascending { base.to_string() } else { format!("-{}", base) }
+        if ascending {
+            base.to_string()
+        } else {
+            format!("-{}", base)
+        }
     }
 }
 
@@ -184,7 +188,8 @@ pub struct SortState {
 
 impl SortState {
     pub fn api_param(&self) -> String {
-        self.criteria.api_param(self.direction == SortDirection::Ascending)
+        self.criteria
+            .api_param(self.direction == SortDirection::Ascending)
     }
 }
 
@@ -281,7 +286,12 @@ impl OptionsState {
     /// Save current state to config
     pub fn save_to_config(&self) {
         let mut config = Config::load();
-        config.update_from_options(self.default_platform, &self.enabled_platforms, self.region, self.default_sort);
+        config.update_from_options(
+            self.default_platform,
+            &self.enabled_platforms,
+            self.region,
+            self.default_sort,
+        );
         config.deals_page_size = self.deals_page_size;
         config.game_info_delay_ms = self.game_info_delay_ms;
         let _ = config.save(); // Ignore errors silently
@@ -330,7 +340,6 @@ pub struct App {
     pub api_key: Option<String>,
     client: ItadClient,
 }
-
 
 impl App {
     pub fn new(api_key: Option<String>) -> Self {
@@ -518,10 +527,14 @@ impl App {
     /// Open price filter popup
     pub fn open_price_filter_popup(&mut self) {
         // Initialize inputs from active filter if any
-        self.price_filter.min_input = self.price_filter.active_min
+        self.price_filter.min_input = self
+            .price_filter
+            .active_min
             .map(|v| format!("{:.0}", v))
             .unwrap_or_default();
-        self.price_filter.max_input = self.price_filter.active_max
+        self.price_filter.max_input = self
+            .price_filter
+            .active_max
             .map(|v| format!("{:.0}", v))
             .unwrap_or_default();
         self.price_filter.selected_field = 0;
@@ -723,12 +736,14 @@ impl App {
     pub fn options_next_item(&mut self) {
         match OptionsTab::ALL[self.options.current_tab] {
             OptionsTab::Region => {
-                self.options.region_list_index = (self.options.region_list_index + 1) % Region::ALL.len();
+                self.options.region_list_index =
+                    (self.options.region_list_index + 1) % Region::ALL.len();
             }
             OptionsTab::Platforms => {
                 // +1 for the "Default Platform" option at the top, rest are platforms without All
                 let total_items = 1 + Self::platforms_without_all().len();
-                self.options.platform_list_index = (self.options.platform_list_index + 1) % total_items;
+                self.options.platform_list_index =
+                    (self.options.platform_list_index + 1) % total_items;
             }
             OptionsTab::Advanced => {
                 // 3 settings: page size, load threshold, game info delay
@@ -802,7 +817,8 @@ impl App {
                 match self.options.advanced_list_index {
                     0 => {
                         // Default sort: cycle through criteria
-                        self.options.default_sort.criteria = self.options.default_sort.criteria.next();
+                        self.options.default_sort.criteria =
+                            self.options.default_sort.criteria.next();
                     }
                     1 => {
                         // Page size: cycle through 25, 50, 100, 200
@@ -940,7 +956,11 @@ impl App {
         self.loading_price_history = Some(game_id);
     }
 
-    pub fn finish_loading_price_history(&mut self, game_id: String, history: Vec<PriceHistoryPoint>) {
+    pub fn finish_loading_price_history(
+        &mut self,
+        game_id: String,
+        history: Vec<PriceHistoryPoint>,
+    ) {
         self.price_history_cache.insert(game_id.clone(), history);
         if self.loading_price_history.as_ref() == Some(&game_id) {
             self.loading_price_history = None;

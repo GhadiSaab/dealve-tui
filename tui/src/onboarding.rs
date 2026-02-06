@@ -10,9 +10,9 @@ use ratatui::{
 };
 use std::io::Stdout;
 use std::time::Instant;
-use tachyonfx::{fx, Effect, EffectTimer, Interpolation, Motion};
 use tachyonfx::fx::EvolveSymbolSet;
 use tachyonfx::pattern::RadialPattern;
+use tachyonfx::{fx, Effect, EffectTimer, Interpolation, Motion};
 
 use crate::config::Config;
 
@@ -121,15 +121,15 @@ fn render_welcome(frame: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Top padding
-            Constraint::Length(6),  // Logo
-            Constraint::Length(2),  // Gap
-            Constraint::Length(1),  // Title
-            Constraint::Length(2),  // Gap
-            Constraint::Length(2),  // Subtitle
-            Constraint::Length(3),  // Gap
-            Constraint::Length(6),  // Info box
-            Constraint::Min(0),     // Remaining space
+            Constraint::Length(3), // Top padding
+            Constraint::Length(6), // Logo
+            Constraint::Length(2), // Gap
+            Constraint::Length(1), // Title
+            Constraint::Length(2), // Gap
+            Constraint::Length(2), // Subtitle
+            Constraint::Length(3), // Gap
+            Constraint::Length(6), // Info box
+            Constraint::Min(0),    // Remaining space
         ])
         .split(area);
 
@@ -144,7 +144,12 @@ fn render_welcome(frame: &mut Frame, area: Rect) {
     // Title
     let title = Paragraph::new(Line::from(vec![
         Span::styled("Welcome to ", Style::default().fg(TEXT_SECONDARY)),
-        Span::styled("Dealve", Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Dealve",
+            Style::default()
+                .fg(PURPLE_LIGHT)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" - Game Deal Finder", Style::default().fg(TEXT_SECONDARY)),
     ]))
     .alignment(Alignment::Center);
@@ -208,7 +213,12 @@ fn render_instructions(frame: &mut Frame, area: Rect) {
     // Title with btop-style brackets
     let title = Paragraph::new(Line::from(vec![
         Span::styled("┐", Style::default().fg(PURPLE_ACCENT)),
-        Span::styled("Getting Your API Key", Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Getting Your API Key",
+            Style::default()
+                .fg(PURPLE_LIGHT)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled("┌", Style::default().fg(PURPLE_ACCENT)),
     ]))
     .alignment(Alignment::Center);
@@ -223,7 +233,9 @@ fn render_instructions(frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(PURPLE_ACCENT));
 
-    let step_style = Style::default().fg(PURPLE_PRIMARY).add_modifier(Modifier::BOLD);
+    let step_style = Style::default()
+        .fg(PURPLE_PRIMARY)
+        .add_modifier(Modifier::BOLD);
     let text_style = Style::default().fg(TEXT_PRIMARY);
 
     let instructions = Paragraph::new(vec![
@@ -231,7 +243,12 @@ fn render_instructions(frame: &mut Frame, area: Rect) {
         Line::from(vec![
             Span::styled("  1. ", step_style),
             Span::styled("Go to ", text_style),
-            Span::styled("isthereanydeal.com", Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::UNDERLINED)),
+            Span::styled(
+                "isthereanydeal.com",
+                Style::default()
+                    .fg(PURPLE_LIGHT)
+                    .add_modifier(Modifier::UNDERLINED),
+            ),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -257,12 +274,23 @@ fn render_instructions(frame: &mut Frame, area: Rect) {
     let tip = Paragraph::new(Line::from(vec![
         Span::styled("Tip: Press ", Style::default().fg(TEXT_SECONDARY)),
         Span::styled("[o]", Style::default().fg(SHORTCUT_KEY)),
-        Span::styled(" to open the website in your browser", Style::default().fg(TEXT_SECONDARY)),
+        Span::styled(
+            " to open the website in your browser",
+            Style::default().fg(TEXT_SECONDARY),
+        ),
     ]))
     .alignment(Alignment::Center);
     frame.render_widget(tip, chunks[5]);
 
-    render_action_hints(frame, area, &[("o", "Open website"), ("Enter", "Continue"), ("Esc", "Back")]);
+    render_action_hints(
+        frame,
+        area,
+        &[
+            ("o", "Open website"),
+            ("Enter", "Continue"),
+            ("Esc", "Back"),
+        ],
+    );
 }
 
 fn render_api_key_entry(frame: &mut Frame, state: &OnboardingState, area: Rect) {
@@ -280,7 +308,12 @@ fn render_api_key_entry(frame: &mut Frame, state: &OnboardingState, area: Rect) 
     // Title
     let title = Paragraph::new(Line::from(vec![
         Span::styled("┐", Style::default().fg(PURPLE_ACCENT)),
-        Span::styled("Enter Your API Key", Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Enter Your API Key",
+            Style::default()
+                .fg(PURPLE_LIGHT)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled("┌", Style::default().fg(PURPLE_ACCENT)),
     ]))
     .alignment(Alignment::Center);
@@ -313,7 +346,10 @@ fn render_api_key_entry(frame: &mut Frame, state: &OnboardingState, area: Rect) 
         ]),
         Line::from(vec![
             Span::styled("│ ", Style::default().fg(TEXT_SECONDARY)),
-            Span::styled(format!("{:<44}", format!("{}{}", displayed, cursor)), Style::default().fg(PURPLE_LIGHT)),
+            Span::styled(
+                format!("{:<44}", format!("{}{}", displayed, cursor)),
+                Style::default().fg(PURPLE_LIGHT),
+            ),
             Span::styled(" │", Style::default().fg(TEXT_SECONDARY)),
         ]),
         Line::from(vec![
@@ -331,26 +367,39 @@ fn render_api_key_entry(frame: &mut Frame, state: &OnboardingState, area: Rect) 
     .block(input_block);
     frame.render_widget(input_content, input_area);
 
-    let toggle_label = if state.key_hidden { "Show key" } else { "Hide key" };
-    render_action_hints(frame, area, &[("Enter", "Validate"), ("t", toggle_label), ("Esc", "Back")]);
+    let toggle_label = if state.key_hidden {
+        "Show key"
+    } else {
+        "Hide key"
+    };
+    render_action_hints(
+        frame,
+        area,
+        &[("Enter", "Validate"), ("t", toggle_label), ("Esc", "Back")],
+    );
 }
 
 fn render_validating(frame: &mut Frame, state: &OnboardingState, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Top padding
-            Constraint::Length(1),  // Title
-            Constraint::Length(5),  // Gap
-            Constraint::Length(1),  // Spinner
-            Constraint::Min(0),     // Remaining
+            Constraint::Length(3), // Top padding
+            Constraint::Length(1), // Title
+            Constraint::Length(5), // Gap
+            Constraint::Length(1), // Spinner
+            Constraint::Min(0),    // Remaining
         ])
         .split(area);
 
     // Title
     let title = Paragraph::new(Line::from(vec![
         Span::styled("┐", Style::default().fg(PURPLE_ACCENT)),
-        Span::styled("Validating...", Style::default().fg(PURPLE_LIGHT).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Validating...",
+            Style::default()
+                .fg(PURPLE_LIGHT)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled("┌", Style::default().fg(PURPLE_ACCENT)),
     ]))
     .alignment(Alignment::Center);
@@ -358,8 +407,14 @@ fn render_validating(frame: &mut Frame, state: &OnboardingState, area: Rect) {
 
     // Spinner
     let spinner = Paragraph::new(Line::from(vec![
-        Span::styled(format!("{} ", state.spinner_char()), Style::default().fg(PURPLE_PRIMARY)),
-        Span::styled("Connecting to IsThereAnyDeal...", Style::default().fg(TEXT_SECONDARY)),
+        Span::styled(
+            format!("{} ", state.spinner_char()),
+            Style::default().fg(PURPLE_PRIMARY),
+        ),
+        Span::styled(
+            "Connecting to IsThereAnyDeal...",
+            Style::default().fg(TEXT_SECONDARY),
+        ),
     ]))
     .alignment(Alignment::Center);
     frame.render_widget(spinner, chunks[3]);
@@ -369,18 +424,23 @@ fn render_success(frame: &mut Frame, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Top padding
-            Constraint::Length(1),  // Title
-            Constraint::Length(2),  // Gap
-            Constraint::Length(8),  // Success box
-            Constraint::Min(0),     // Remaining
+            Constraint::Length(3), // Top padding
+            Constraint::Length(1), // Title
+            Constraint::Length(2), // Gap
+            Constraint::Length(8), // Success box
+            Constraint::Min(0),    // Remaining
         ])
         .split(area);
 
     // Title
     let title = Paragraph::new(Line::from(vec![
         Span::styled("┐", Style::default().fg(ACCENT_GREEN)),
-        Span::styled("Setup Complete!", Style::default().fg(ACCENT_GREEN).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Setup Complete!",
+            Style::default()
+                .fg(ACCENT_GREEN)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled("┌", Style::default().fg(ACCENT_GREEN)),
     ]))
     .alignment(Alignment::Center);
@@ -399,7 +459,9 @@ fn render_success(frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled(
             "✓ API Key Valid!",
-            Style::default().fg(ACCENT_GREEN).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(ACCENT_GREEN)
+                .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
@@ -429,7 +491,10 @@ fn render_failed(frame: &mut Frame, area: Rect, error: &str) {
     // Title
     let title = Paragraph::new(Line::from(vec![
         Span::styled("┐", Style::default().fg(ERROR_RED)),
-        Span::styled("Validation Failed", Style::default().fg(ERROR_RED).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Validation Failed",
+            Style::default().fg(ERROR_RED).add_modifier(Modifier::BOLD),
+        ),
         Span::styled("┌", Style::default().fg(ERROR_RED)),
     ]))
     .alignment(Alignment::Center);
@@ -451,10 +516,7 @@ fn render_failed(frame: &mut Frame, area: Rect, error: &str) {
             Style::default().fg(ERROR_RED).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled(
-            error,
-            Style::default().fg(TEXT_SECONDARY),
-        )),
+        Line::from(Span::styled(error, Style::default().fg(TEXT_SECONDARY))),
         Line::from(""),
         Line::from(Span::styled(
             "Please check your key and try again.",
@@ -465,7 +527,11 @@ fn render_failed(frame: &mut Frame, area: Rect, error: &str) {
     .block(error_block);
     frame.render_widget(error_text, error_area);
 
-    render_action_hints(frame, area, &[("Enter", "Try again"), ("o", "Open ITAD"), ("Esc", "Quit")]);
+    render_action_hints(
+        frame,
+        area,
+        &[("Enter", "Try again"), ("o", "Open ITAD"), ("Esc", "Quit")],
+    );
 }
 
 fn render_progress_dots(frame: &mut Frame, state: &OnboardingState, area: Rect) {
@@ -482,13 +548,41 @@ fn render_progress_dots(frame: &mut Frame, state: &OnboardingState, area: Rect) 
             Style::default().fg(PURPLE_LIGHT),
         ),
         Span::styled(" of 4] ", Style::default().fg(TEXT_SECONDARY)),
-        Span::styled(if dots[0] { "●" } else { "○" }, Style::default().fg(if dots[0] { PURPLE_PRIMARY } else { TEXT_SECONDARY })),
+        Span::styled(
+            if dots[0] { "●" } else { "○" },
+            Style::default().fg(if dots[0] {
+                PURPLE_PRIMARY
+            } else {
+                TEXT_SECONDARY
+            }),
+        ),
         Span::styled(" ", Style::default()),
-        Span::styled(if dots[1] { "●" } else { "○" }, Style::default().fg(if dots[1] { PURPLE_PRIMARY } else { TEXT_SECONDARY })),
+        Span::styled(
+            if dots[1] { "●" } else { "○" },
+            Style::default().fg(if dots[1] {
+                PURPLE_PRIMARY
+            } else {
+                TEXT_SECONDARY
+            }),
+        ),
         Span::styled(" ", Style::default()),
-        Span::styled(if dots[2] { "●" } else { "○" }, Style::default().fg(if dots[2] { PURPLE_PRIMARY } else { TEXT_SECONDARY })),
+        Span::styled(
+            if dots[2] { "●" } else { "○" },
+            Style::default().fg(if dots[2] {
+                PURPLE_PRIMARY
+            } else {
+                TEXT_SECONDARY
+            }),
+        ),
         Span::styled(" ", Style::default()),
-        Span::styled(if dots[3] { "●" } else { "○" }, Style::default().fg(if dots[3] { PURPLE_PRIMARY } else { TEXT_SECONDARY })),
+        Span::styled(
+            if dots[3] { "●" } else { "○" },
+            Style::default().fg(if dots[3] {
+                PURPLE_PRIMARY
+            } else {
+                TEXT_SECONDARY
+            }),
+        ),
     ]);
 
     let y = area.height.saturating_sub(4);

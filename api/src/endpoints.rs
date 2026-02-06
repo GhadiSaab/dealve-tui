@@ -1,5 +1,11 @@
-use dealve_core::{models::{Deal, GameInfo, PriceHistoryPoint}, DealveError, Result};
-use crate::{client::ItadClient, types::{DealsResponse, GameInfoResponse, PriceHistoryItem}};
+use crate::{
+    client::ItadClient,
+    types::{DealsResponse, GameInfoResponse, PriceHistoryItem},
+};
+use dealve_core::{
+    models::{Deal, GameInfo, PriceHistoryPoint},
+    DealveError, Result,
+};
 
 impl ItadClient {
     pub async fn get_deals(
@@ -10,9 +16,9 @@ impl ItadClient {
         shop_id: Option<u32>,
         sort: Option<&str>,
     ) -> Result<Vec<Deal>> {
-        let api_key = self.api_key().ok_or_else(|| {
-            DealveError::Config("API key is required".to_string())
-        })?;
+        let api_key = self
+            .api_key()
+            .ok_or_else(|| DealveError::Config("API key is required".to_string()))?;
 
         let url = format!("{}/deals/v2", self.base_url());
 
@@ -57,9 +63,9 @@ impl ItadClient {
     }
 
     pub async fn get_game_info(&self, game_id: &str) -> Result<GameInfo> {
-        let api_key = self.api_key().ok_or_else(|| {
-            DealveError::Config("API key is required".to_string())
-        })?;
+        let api_key = self
+            .api_key()
+            .ok_or_else(|| DealveError::Config("API key is required".to_string()))?;
 
         let url = format!("{}/games/info/v2", self.base_url());
 
@@ -89,10 +95,14 @@ impl ItadClient {
     }
 
     /// Get price history for a game (max 1 year of data)
-    pub async fn get_price_history(&self, game_id: &str, country: &str) -> Result<Vec<PriceHistoryPoint>> {
-        let api_key = self.api_key().ok_or_else(|| {
-            DealveError::Config("API key is required".to_string())
-        })?;
+    pub async fn get_price_history(
+        &self,
+        game_id: &str,
+        country: &str,
+    ) -> Result<Vec<PriceHistoryPoint>> {
+        let api_key = self
+            .api_key()
+            .ok_or_else(|| DealveError::Config("API key is required".to_string()))?;
 
         let url = format!("{}/games/history/v2", self.base_url());
 
@@ -166,7 +176,9 @@ impl ItadClient {
         match response.status().as_u16() {
             200..=299 => Ok(()),
             401 | 403 => Err(DealveError::Api("Invalid API key".to_string())),
-            429 => Err(DealveError::Api("Rate limited - please wait and try again".to_string())),
+            429 => Err(DealveError::Api(
+                "Rate limited - please wait and try again".to_string(),
+            )),
             _ => {
                 let body = response.text().await.unwrap_or_default();
                 Err(DealveError::Api(format!("API error: {}", body)))

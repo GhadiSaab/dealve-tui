@@ -84,8 +84,14 @@ impl From<GameInfoResponse> for dealve_core::models::GameInfo {
             id: resp.id,
             title: resp.title,
             release_date: resp.release_date,
-            developers: resp.developers.map(|d| d.into_iter().map(|c| c.name).collect()).unwrap_or_default(),
-            publishers: resp.publishers.map(|p| p.into_iter().map(|c| c.name).collect()).unwrap_or_default(),
+            developers: resp
+                .developers
+                .map(|d| d.into_iter().map(|c| c.name).collect())
+                .unwrap_or_default(),
+            publishers: resp
+                .publishers
+                .map(|p| p.into_iter().map(|c| c.name).collect())
+                .unwrap_or_default(),
             tags: resp.tags.unwrap_or_default(),
         }
     }
