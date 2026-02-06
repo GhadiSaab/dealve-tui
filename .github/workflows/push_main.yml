@@ -1,0 +1,27 @@
+name: 👾 Push to main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Lint
+    uses: ./.github/workflows/lint.yml
+
+  test:
+    needs: lint
+    name: Test
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    name: Build
+    uses: ./.github/workflows/build.yml
+
+  release-cargo:
+    needs: build
+    name: Release Cargo
+    secrets: inherit
+    uses: ./.github/workflows/release_cargo.yml

@@ -1,0 +1,18 @@
+name: 👾 Test
+
+on:
+  workflow_call:
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout project
+      - uses: dtolnay/rust-toolchain@stable
+        name: Install the Rust toolchain
+      - uses: Swatinem/rust-cache@v2
+        name: Use cached dependencies
+      - name: Run tests
+        run: cargo test --verbose
