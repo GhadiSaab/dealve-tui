@@ -104,15 +104,6 @@ pub enum SortCriteria {
 }
 
 impl SortCriteria {
-    pub const ALL: &'static [SortCriteria] = &[
-        SortCriteria::Price,
-        SortCriteria::Cut,
-        SortCriteria::Hottest,
-        SortCriteria::ReleaseDate,
-        SortCriteria::Expiring,
-        SortCriteria::Popular,
-    ];
-
     pub fn name(&self) -> &str {
         match self {
             SortCriteria::Price => "Price",
@@ -192,10 +183,6 @@ pub struct SortState {
 }
 
 impl SortState {
-    pub fn label(&self) -> String {
-        format!("{} {}", self.criteria.name(), self.direction.arrow())
-    }
-
     pub fn api_param(&self) -> String {
         self.criteria.api_param(self.direction == SortDirection::Ascending)
     }
